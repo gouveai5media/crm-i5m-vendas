@@ -8,9 +8,9 @@ import { supabase } from "../lib/supabase";
 const ADMIN_EMAIL = "i5mediaagencia@gmail.com";
 const stages = ["Novo lead", "Primeiro contato", "Follow-up", "Reunião marcada", "Proposta enviada", "Negociação", "Ganho", "Perdido"];
 const directRegistrationStages = stages.filter((stage) => !["Follow-up", "Reunião marcada"].includes(stage));
-const nav = ["Visão geral", "Leads", "Pipeline", "Follow-ups", "Reuniões", "Propostas", "Clientes", "Chamados", "Equipe", "Chat interno"];
-const agentMenuOptions = nav.filter((item) => item !== "Equipe");
-const navIcons: Record<string, string> = { "Visão geral": "▦", Leads: "◎", Pipeline: "▥", "Follow-ups": "◷", Reuniões: "▣", Propostas: "▤", Clientes: "♙", Chamados: "◈", Equipe: "♚", "Chat interno": "◌" };
+const nav = ["Visão geral", "Leads", "Pipeline", "Follow-ups", "Reuniões", "Propostas", "Clientes", "Chamados", "WhatsApp", "Equipe", "Chat interno", "Configurações"];
+const agentMenuOptions = nav.filter((item) => !["Equipe", "Configurações"].includes(item));
+const navIcons: Record<string, string> = { "Visão geral": "▦", Leads: "◎", Pipeline: "▥", "Follow-ups": "◷", Reuniões: "▣", Propostas: "▤", Clientes: "♙", Chamados: "◈", WhatsApp: "◉", Equipe: "♚", "Chat interno": "◌", Configurações: "⚙" };
 
 type Profile = { id: string; email: string; full_name: string; role: "super_admin" | "executive" | "client"; active: boolean; menu_permissions: string[]; can_view_revenue: boolean };
 type Service = { id: string; name: string };
@@ -87,6 +87,17 @@ type NewCompanyInput = {
 type FollowupInput = { id?: string; companyId: string; assignedTo: string; type: string; title: string; notes: string; dueAt: string };
 type MeetingInput = { companyId: string; executiveId: string; scheduledAt: string; notes: string; rescheduledFrom?: string };
 type ImportRecord = Record<string, string | number>;
+type WhatsAppConnectionConfig = {
+  id: string;
+  provider: string;
+  status: "not_configured" | "configured" | "connected" | "disconnected" | "error";
+  device_name: string | null;
+  masked_identifier: string | null;
+  webhook_ready: boolean;
+  last_tested_at: string | null;
+  last_error: string | null;
+};
+type WhatsAppWebhookEvent = { id: string; event_type: string; processed: boolean; error: string | null; received_at: string };
 
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const dateTime = (value?: string | null) => value ? new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "Sem agendamento";
@@ -352,10 +363,12 @@ function AuthenticatedApp({ user }: { user: User }) {
           {activePage === "Propostas" && <Proposals leads={leads}/>}
           {activePage === "Clientes" && <Clients leads={leads.filter((lead) => lead.stage === "Ganho")} canViewRevenue={canViewRevenue} onAdd={openClient}/>}
           {activePage === "Chamados" && <Tickets/>}
+          {activePage === "WhatsApp" && <WhatsAppFoundation profile={profile} go={setPage}/>}
           {activePage === "Equipe" && (
             <Team profiles={profiles} leads={leads} meetings={meetings} onAdd={() => { setActiveExecutive(null); setModal("user"); }} onEdit={(executive) => { setActiveExecutive(executive); setModal("permissions"); }}/>
           )}
           {activePage === "Chat interno" && <Chat profile={profile}/>}
+          {activePage === "Configurações" && profile.role === "super_admin" && <WhatsAppSettings/>}
           {!activePage && <EmptyPanel title="Nenhum módulo liberado" text="Peça ao Super Admin para selecionar ao menos um menu para este acesso."/>}
         </section>
       </main>
@@ -418,7 +431,7 @@ function Title({ page, name, onLead, onClient, onImport, onFollowup, onMeeting }
   const data: Record<string, [string, string]> = {
     "Visão geral": [`Olá, ${name}! 👋`, "Resultados, agenda e desempenho comercial em tempo real."], Leads: ["Leads e contatos", "Cadastros completos com empresa, responsável e localização."], Pipeline: ["Pipeline de vendas", "Arraste os cards e acompanhe cada oportunidade."],
     "Follow-ups": ["Follow-ups e agenda", "Próximas ações com data, responsável e conclusão."], Reuniões: ["Central de reuniões", "Agendamentos, reagendamentos e resultado da conexão."], Propostas: ["Propostas e orçamentos", "Crie, envie e acompanhe propostas comerciais."],
-    Clientes: ["Clientes", "Cadastre clientes diretamente ou converta leads ganhos."], Chamados: ["Chamados dos clientes", "Centralize solicitações após o fechamento."], Equipe: ["Equipe e desempenho", "Compare quem mais agenda e quem mais fecha contratos."], "Chat interno": ["Chat interno", "Conversas privadas e canais da equipe."],
+    Clientes: ["Clientes", "Cadastre clientes diretamente ou converta leads ganhos."], Chamados: ["Chamados dos clientes", "Centralize solicitações após o fechamento."], WhatsApp: ["WhatsApp Multiatendimento", "Acompanhe a conexão da DROPE e prepare as filas de atendimento."], Equipe: ["Equipe e desempenho", "Compare quem mais agenda e quem mais fecha contratos."], "Chat interno": ["Chat interno", "Conversas privadas e canais da equipe."], Configurações: ["Configurações", "Integrações e regras administrativas do CRM."],
   };
   return <div className="title"><div><span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(new Date()).toUpperCase()}</span><h1>{data[page]?.[0]}</h1><p>{data[page]?.[1]}</p></div><div className="title-actions">{["Visão geral", "Leads"].includes(page) && <><button className="ghost" onClick={onImport}>⇧ Importar Excel</button><button className="primary" onClick={onLead}>＋ Novo lead</button></>}{page === "Clientes" && <button className="primary" onClick={onClient}>＋ Cadastrar cliente</button>}{page === "Follow-ups" && <button className="primary" onClick={onFollowup}>＋ Agendar follow-up</button>}{page === "Reuniões" && <button className="primary" onClick={onMeeting}>＋ Agendar reunião</button>}</div></div>;
 }
@@ -480,6 +493,63 @@ function Tickets() { return <EmptyPanel title="Central de chamados pronta" text=
 function Team({ profiles, leads, meetings, onAdd, onEdit }: { profiles: Profile[]; leads: Lead[]; meetings: Meeting[]; onAdd: () => void; onEdit: (profile: Profile) => void }) {
   const executives = profiles.filter((item) => item.role === "executive");
   return <><div className="section-actions"><button className="primary" onClick={onAdd}>＋ Cadastrar executivo</button></div>{executives.length > 0 && <div className="agent-access-grid">{executives.map((executive) => <article className="panel agent-access-card" key={executive.id}><div><Avatar name={executive.full_name || executive.email}/><span><b>{executive.full_name || executive.email}</b><small>{executive.email}</small></span><Pill status={executive.active ? "Ativo" : "Inativo"}/></div><p>{executive.menu_permissions.length} módulos liberados</p><div className="permission-tags">{executive.menu_permissions.map((item) => <span key={item}>{item}</span>)}</div><b className={executive.can_view_revenue ? "financial-yes" : "financial-no"}>{executive.can_view_revenue ? "✓ Visualiza valores e faturamento" : "⊘ Valores financeiros ocultos"}</b><button className="ghost" onClick={() => onEdit(executive)}>Editar acessos</button></article>)}</div>}<PerformancePanel rows={getPerformance(profiles, leads, meetings)}/></>;
+}
+
+function WhatsAppFoundation({ profile, go }: { profile: Profile; go: (page: string) => void }) {
+  return <div className="whatsapp-foundation"><div className="wa-foundation-hero panel"><div className="wa-mark">◉</div><span><label className="tag">MÓDULO EM ATIVAÇÃO</label><h2>WhatsApp Multiatendimento</h2><p>A base segura para receber eventos da DROPE, organizar filas e vincular cada conversa aos leads do CRM já está sendo configurada.</p></span>{profile.role === "super_admin" && <button className="primary" onClick={() => go("Configurações")}>Configurar DROPE</button>}</div><div className="wa-phase-grid"><article className="panel done"><i>✓</i><b>Arquitetura preservada</b><small>Perfis, empresas, contatos e funil continuam sendo a fonte oficial.</small></article><article className="panel done"><i>✓</i><b>Estrutura isolada</b><small>Conversas externas não utilizam o chat interno da equipe.</small></article><article className="panel active"><i>3</i><b>Conexão real</b><small>O próximo marco é receber o primeiro webhook verdadeiro da DROPE.</small></article></div><article className="panel wa-no-mock"><b>Nenhuma conversa fictícia será criada</b><p>A caixa de atendimento será liberada depois que uma mensagem real percorrer WhatsApp → DROPE → Supabase, conforme a regra do projeto.</p></article></div>;
+}
+
+function WhatsAppSettings() {
+  const [connection, setConnection] = useState<WhatsAppConnectionConfig | null>(null);
+  const [events, setEvents] = useState<WhatsAppWebhookEvent[]>([]);
+  const [apiKey, setApiKey] = useState("");
+  const [devices, setDevices] = useState<string[]>([]);
+  const [deviceName, setDeviceName] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [busy, setBusy] = useState("");
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  const invoke = useCallback(async (action: string, payload: Record<string, unknown> = {}) => {
+    const { data, error: invokeError } = await supabase.functions.invoke("whatsapp-admin", { body: { action, ...payload } });
+    if (invokeError) throw invokeError;
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }, []);
+
+  const load = useCallback(async () => {
+    setBusy("load"); setError("");
+    try {
+      const data = await invoke("get_config");
+      setConnection(data.connection ?? null);
+      setEvents(data.recent_events ?? []);
+      if (data.connection?.device_name) setDeviceName(data.connection.device_name);
+    } catch (loadError) { setError(errorMessage(loadError)); }
+    finally { setBusy(""); }
+  }, [invoke]);
+
+  useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
+
+  const run = async (action: string, payload: Record<string, unknown>, success: string) => {
+    setBusy(action); setError(""); setNotice("");
+    try {
+      const data = await invoke(action, payload);
+      if (data.devices) {
+        const next = (data.devices as { name: string }[]).map((item) => item.name);
+        setDevices(next);
+        if (!deviceName && next[0]) setDeviceName(next[0]);
+      }
+      if (data.webhook_url) setWebhookUrl(data.webhook_url);
+      setNotice(success);
+      if (action !== "rotate_webhook_secret") await load();
+    } catch (runError) { setError(errorMessage(runError)); }
+    finally { setBusy(""); }
+  };
+
+  const status = connection?.status ?? "not_configured";
+  const statusText: Record<string, string> = { not_configured: "Não configurado", configured: "Chave configurada", connected: "Conectado", disconnected: "Desconectado", error: "Erro de conexão" };
+
+  return <div className="wa-settings"><aside className="panel wa-settings-nav"><b>WHATSAPP</b>{["Integração", "Agentes", "Setores e filas", "Triagem", "Distribuição", "Inteligência Artificial"].map((item, index) => <button className={index === 0 ? "selected" : ""} disabled={index !== 0} key={item}><span>{["⌁", "♙", "▦", "◇", "↻", "✦"][index]}</span>{item}{index !== 0 && <small>Próxima fase</small>}</button>)}</aside><main className="wa-settings-main"><article className="panel wa-integration-card"><div className="wa-integration-head"><span><label className="tag">PROVEDOR</label><h2>DROPE WhatsApp API</h2><p>A chave é enviada somente ao backend e armazenada criptografada no Supabase Vault.</p></span><b className={`wa-status ${status}`}><i/>{statusText[status]}</b></div><div className="wa-secret-field"><label>Chave API DROPE<input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder={connection?.masked_identifier ?? "Cole a chave da sua conta DROPE"} autoComplete="off"/></label><button className="primary" disabled={apiKey.trim().length < 12 || Boolean(busy)} onClick={() => void run("save_api_key", { api_key: apiKey }, "Chave salva com segurança")}>{busy === "save_api_key" ? "Salvando..." : connection?.masked_identifier ? "Trocar chave" : "Salvar chave"}</button></div>{connection?.masked_identifier && <small className="wa-masked">Chave armazenada: {connection.masked_identifier}</small>}<div className="wa-integration-actions"><button className="ghost" disabled={!connection?.masked_identifier || Boolean(busy)} onClick={() => void run("test_connection", {}, "Conexão com a DROPE validada")}>{busy === "test_connection" ? "Testando..." : "Testar conexão"}</button><button className="ghost" disabled={!connection?.masked_identifier || Boolean(busy)} onClick={() => void run("rotate_webhook_secret", {}, "Novo endereço seguro de webhook gerado")}>Gerar webhook seguro</button></div>{devices.length > 0 && <div className="wa-device-picker"><label>Dispositivo WhatsApp<select value={deviceName} onChange={(event) => setDeviceName(event.target.value)}>{devices.map((item) => <option key={item}>{item}</option>)}</select></label><button className="primary" disabled={!deviceName || Boolean(busy)} onClick={() => void run("select_device", { device_name: deviceName }, "Dispositivo vinculado ao CRM")}>{busy === "select_device" ? "Vinculando..." : "Vincular dispositivo"}</button></div>}{webhookUrl && <div className="wa-webhook-once"><b>Copie este webhook agora</b><p>Por segurança, o endereço completo é exibido somente nesta geração.</p><code>{webhookUrl}</code><button className="ghost-small" onClick={() => void navigator.clipboard.writeText(webhookUrl)}>Copiar endereço</button></div>}{error && <div className="auth-error">{error}</div>}{notice && <div className="auth-success">✓ {notice}</div>}</article><div className="wa-security-grid"><article className="panel"><i>▣</i><span><b>Credencial protegida</b><small>Nunca é gravada no frontend, código ou GitHub.</small></span></article><article className="panel"><i>⌁</i><span><b>Dispositivo</b><small>{connection?.device_name ?? "Ainda não selecionado"}</small></span></article><article className="panel"><i>◈</i><span><b>Webhook</b><small>{connection?.webhook_ready ? "Token de entrada gerado" : "Aguardando geração"}</small></span></article></div><article className="panel wa-events"><PanelHead title="Eventos reais recebidos" subtitle="Diagnóstico do webhook DROPE"/>{busy === "load" ? <p>Carregando...</p> : events.length ? events.map((item) => <div key={item.id}><span><b>{item.event_type}</b><small>{dateTime(item.received_at)}</small></span><Pill status={item.error ? "Erro" : item.processed ? "Processado" : "Recebido"}/></div>) : <Empty title="Nenhum evento recebido" text="Depois de configurar o webhook na DROPE, envie uma mensagem real para validar esta etapa."/>}</article></main></div>;
 }
 
 function Chat({ profile }: { profile: Profile }) {
