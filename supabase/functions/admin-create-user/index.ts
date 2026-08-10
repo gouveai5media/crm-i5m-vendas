@@ -43,7 +43,7 @@ Deno.serve(async (request) => {
     return json({ error: "Apenas o Super Admin pode criar acessos" }, 403);
   }
 
-  let payload: { email?: string; password?: string; full_name?: string; role?: string; company_id?: string };
+  let payload: { email?: string; password?: string; full_name?: string; role?: string; company_id?: string; menu_permissions?: string[]; can_view_revenue?: boolean };
   try {
     payload = await request.json();
   } catch {
@@ -53,8 +53,16 @@ Deno.serve(async (request) => {
   const email = payload.email?.trim().toLowerCase();
   const fullName = payload.full_name?.trim();
   const role = payload.role === "client" ? "client" : "executive";
+  const allowedMenus = ["Visão geral", "Leads", "Pipeline", "Follow-ups", "Reuniões", "Propostas", "Clientes", "Chamados", "Chat interno"];
+  const menuPermissions = role === "executive" && Array.isArray(payload.menu_permissions)
+    ? [...new Set(payload.menu_permissions)].filter((item) => allowedMenus.includes(item))
+    : [];
+  const canViewRevenue = role === "executive" && payload.can_view_revenue === true;
   if (!email || !email.includes("@") || !fullName || !payload.password || payload.password.length < 8) {
     return json({ error: "Informe nome, e-mail e senha com no mínimo 8 caracteres" }, 400);
+  }
+  if (role === "executive" && menuPermissions.length === 0) {
+    return json({ error: "Selecione ao menos um menu para o executivo" }, 400);
   }
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -70,7 +78,7 @@ Deno.serve(async (request) => {
 
   const { error: profileError } = await admin
     .from("profiles")
-    .update({ full_name: fullName, role, active: true })
+    .update({ full_name: fullName, role, active: true, menu_permissions: menuPermissions, can_view_revenue: canViewRevenue })
     .eq("id", created.user.id);
 
   if (profileError) {
@@ -87,6 +95,6 @@ Deno.serve(async (request) => {
   }
 
   return json({
-    user: { id: created.user.id, email, full_name: fullName, role },
+    user: { id: created.user.id, email, full_name: fullName, role, menu_permissions: menuPermissions, can_view_revenue: canViewRevenue },
   }, 201);
 });

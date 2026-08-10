@@ -9,9 +9,10 @@ const ADMIN_EMAIL = "i5mediaagencia@gmail.com";
 const stages = ["Novo lead", "Primeiro contato", "Follow-up", "Reunião marcada", "Proposta enviada", "Negociação", "Ganho", "Perdido"];
 const directRegistrationStages = stages.filter((stage) => !["Follow-up", "Reunião marcada"].includes(stage));
 const nav = ["Visão geral", "Leads", "Pipeline", "Follow-ups", "Reuniões", "Propostas", "Clientes", "Chamados", "Equipe", "Chat interno"];
+const agentMenuOptions = nav.filter((item) => item !== "Equipe");
 const navIcons: Record<string, string> = { "Visão geral": "▦", Leads: "◎", Pipeline: "▥", "Follow-ups": "◷", Reuniões: "▣", Propostas: "▤", Clientes: "♙", Chamados: "◈", Equipe: "♚", "Chat interno": "◌" };
 
-type Profile = { id: string; email: string; full_name: string; role: "super_admin" | "executive" | "client"; active: boolean };
+type Profile = { id: string; email: string; full_name: string; role: "super_admin" | "executive" | "client"; active: boolean; menu_permissions: string[]; can_view_revenue: boolean };
 type Service = { id: string; name: string };
 
 type Lead = {
@@ -132,6 +133,7 @@ function AuthenticatedApp({ user }: { user: User }) {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [activeFollowup, setActiveFollowup] = useState<Followup | null>(null);
   const [activeMeeting, setActiveMeeting] = useState<Meeting | null>(null);
+  const [activeExecutive, setActiveExecutive] = useState<Profile | null>(null);
   const [toast, setToast] = useState("");
 
   const flash = (message: string) => {
@@ -142,8 +144,8 @@ function AuthenticatedApp({ user }: { user: User }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     const [profileResult, teamResult, serviceResult, companyResult, followupResult, meetingResult] = await Promise.all([
-      supabase.from("profiles").select("id,email,full_name,role,active").eq("id", user.id).single(),
-      supabase.from("profiles").select("id,email,full_name,role,active").order("full_name"),
+      supabase.from("profiles").select("id,email,full_name,role,active,menu_permissions,can_view_revenue").eq("id", user.id).single(),
+      supabase.from("profiles").select("id,email,full_name,role,active,menu_permissions,can_view_revenue").order("full_name"),
       supabase.from("services").select("id,name").eq("active", true).order("name"),
       supabase.from("companies").select("id,name,legal_name,cnpj,email,phone,address,estimated_value,stage,owner_id,service_id,contacts(name,email,phone,is_primary),services(name),followups(due_at,completed_at)").order("created_at", { ascending: false }),
       supabase.from("followups").select("id,company_id,assigned_to,type,title,notes,due_at,completed_at,companies(name)").order("due_at", { ascending: true }),
@@ -297,7 +299,7 @@ function AuthenticatedApp({ user }: { user: User }) {
       const { data, error } = await supabase.from("companies").insert({
         name, legal_name: String(record.razao_social ?? "") || null, cnpj: cnpj || null, email: email || null,
         phone: String(record.telefone_empresa ?? "") || null, address: String(record.localizacao ?? "") || null,
-        service_id: serviceId, estimated_value: Number(record.valor_estimado ?? 0) || 0, source: String(record.origem ?? "Manual"), stage, owner_id: ownerId, created_by: user.id,
+        service_id: serviceId, estimated_value: canViewRevenue ? Number(record.valor_estimado ?? 0) || 0 : 0, source: String(record.origem ?? "Manual"), stage, owner_id: ownerId, created_by: user.id,
       }).select("id").single();
       if (error || !data) continue;
       const contactName = String(record.contato_nome ?? "").trim();
@@ -313,7 +315,9 @@ function AuthenticatedApp({ user }: { user: User }) {
   if (loading || !profile) return <LoadingScreen/>;
   if (profile.role === "client") return <ClientPortal profile={profile} leads={leads}/>;
 
-  const visibleNav = profile.role === "super_admin" ? nav : nav.filter((item) => item !== "Equipe");
+  const visibleNav = profile.role === "super_admin" ? nav : agentMenuOptions.filter((item) => profile.menu_permissions.includes(item));
+  const activePage = visibleNav.includes(page) ? page : visibleNav[0] ?? "";
+  const canViewRevenue = profile.role === "super_admin" || profile.can_view_revenue;
   const displayName = profile.full_name || profile.email.split("@")[0];
   const openLead = () => { setActiveLead(null); setModal("lead"); };
   const openClient = () => { setActiveLead(null); setModal("client"); };
@@ -322,7 +326,7 @@ function AuthenticatedApp({ user }: { user: User }) {
     <div className="shell">
       <aside>
         <div className="brand"><b>i5</b><span><strong>I5MEDIA</strong><small>Sales Hub</small></span></div>
-        <nav>{visibleNav.map((item) => <button className={page === item ? "active" : ""} onClick={() => setPage(item)} key={item}><i>{navIcons[item]}</i>{item}</button>)}</nav>
+        <nav>{visibleNav.map((item) => <button className={activePage === item ? "active" : ""} onClick={() => setPage(item)} key={item}><i>{navIcons[item]}</i>{item}</button>)}</nav>
         <div className="storage"><span>Supabase <b>Conectado</b></span><progress value="100" max="100"/><small>Dados e segurança ativos</small></div>
       </aside>
       <main>
@@ -333,29 +337,45 @@ function AuthenticatedApp({ user }: { user: User }) {
           <button className="logout" onClick={() => supabase.auth.signOut()}>Sair</button>
         </header>
         <section>
-          <Title page={page} name={displayName.split(" ")[0]} onLead={openLead} onClient={openClient} onImport={() => setModal("import")} onFollowup={() => { setActiveFollowup(null); setActiveLead(null); setModal("followup"); }} onMeeting={() => { setActiveMeeting(null); setActiveLead(null); setModal("meeting"); }}/>
-          {page === "Visão geral" && <Dashboard leads={leads} meetings={meetings} profiles={profiles} stats={stats} go={setPage}/>}
-          {page === "Leads" && <LeadList leads={leads}/>}
-          {page === "Pipeline" && <Pipeline leads={leads} move={requestStageChange}/>}
-          {page === "Follow-ups" && <FollowupsView followups={followups} onComplete={completeFollowup} onEdit={(item) => { setActiveFollowup(item); setActiveLead(leads.find((lead) => lead.id === item.companyId) ?? null); setModal("followup"); }}/>}
-          {page === "Reuniões" && <MeetingsView meetings={meetings} profiles={profiles} onResult={updateMeetingResult} onReschedule={(item) => { setActiveMeeting(item); setActiveLead(leads.find((lead) => lead.id === item.companyId) ?? null); setModal("meeting"); }}/>}
-          {page === "Propostas" && <Proposals leads={leads}/>}
-          {page === "Clientes" && <Clients leads={leads.filter((lead) => lead.stage === "Ganho")} onAdd={openClient}/>}
-          {page === "Chamados" && <Tickets/>}
-          {page === "Equipe" && <Team profiles={profiles} leads={leads} meetings={meetings} onAdd={() => setModal("user")}/>}
-          {page === "Chat interno" && <Chat profile={profile}/>}
+          {activePage && (
+            <Title page={activePage} name={displayName.split(" ")[0]} onLead={openLead} onClient={openClient} onImport={() => setModal("import")} onFollowup={() => { setActiveFollowup(null); setActiveLead(null); setModal("followup"); }} onMeeting={() => { setActiveMeeting(null); setActiveLead(null); setModal("meeting"); }}/>
+          )}
+          {activePage === "Visão geral" && <Dashboard leads={leads} meetings={meetings} profiles={profiles} stats={stats} canViewRevenue={canViewRevenue} go={setPage}/>}
+          {activePage === "Leads" && <LeadList leads={leads} canViewRevenue={canViewRevenue}/>}
+          {activePage === "Pipeline" && <Pipeline leads={leads} canViewRevenue={canViewRevenue} move={requestStageChange}/>}
+          {activePage === "Follow-ups" && (
+            <FollowupsView followups={followups} onComplete={completeFollowup} onEdit={(item) => { setActiveFollowup(item); setActiveLead(leads.find((lead) => lead.id === item.companyId) ?? null); setModal("followup"); }}/>
+          )}
+          {activePage === "Reuniões" && (
+            <MeetingsView meetings={meetings} profiles={profiles} onResult={updateMeetingResult} onReschedule={(item) => { setActiveMeeting(item); setActiveLead(leads.find((lead) => lead.id === item.companyId) ?? null); setModal("meeting"); }}/>
+          )}
+          {activePage === "Propostas" && <Proposals leads={leads}/>}
+          {activePage === "Clientes" && <Clients leads={leads.filter((lead) => lead.stage === "Ganho")} canViewRevenue={canViewRevenue} onAdd={openClient}/>}
+          {activePage === "Chamados" && <Tickets/>}
+          {activePage === "Equipe" && (
+            <Team profiles={profiles} leads={leads} meetings={meetings} onAdd={() => { setActiveExecutive(null); setModal("user"); }} onEdit={(executive) => { setActiveExecutive(executive); setModal("permissions"); }}/>
+          )}
+          {activePage === "Chat interno" && <Chat profile={profile}/>}
+          {!activePage && <EmptyPanel title="Nenhum módulo liberado" text="Peça ao Super Admin para selecionar ao menos um menu para este acesso."/>}
         </section>
       </main>
-      <button className="float" onClick={() => setPage("Chat interno")} aria-label="Abrir chat">◌</button>
+      {visibleNav.includes("Chat interno") && <button className="float" onClick={() => setPage("Chat interno")} aria-label="Abrir chat">◌</button>}
       {toast && <div className="toast">✓ {toast}</div>}
       {modal && <Modal close={() => setModal("")}>
         {modal === "import" && (
           <ImportModal onImport={importRecords} onDone={(message) => { setModal(""); flash(message); }}/>
         )}
-        {(modal === "lead" || modal === "client") && <CompanyForm services={services} profiles={staffProfiles} currentUserId={user.id} initialStage={modal === "client" ? "Ganho" : "Novo lead"} done={async (input) => { try { await saveCompany(input); setModal(""); flash(modal === "client" ? "Cliente cadastrado" : "Lead cadastrado"); } catch (error) { flash(errorMessage(error)); } }}/>}
+        {(modal === "lead" || modal === "client") && (
+          <CompanyForm services={services} profiles={staffProfiles} currentUserId={user.id} canViewRevenue={canViewRevenue} initialStage={modal === "client" ? "Ganho" : "Novo lead"} done={async (input) => { try { await saveCompany(input); setModal(""); flash(modal === "client" ? "Cliente cadastrado" : "Lead cadastrado"); } catch (error) { flash(errorMessage(error)); } }}/>
+        )}
         {modal === "followup" && <FollowupForm leads={leads} profiles={staffProfiles} lead={activeLead} existing={activeFollowup} currentUserId={user.id} done={async (input) => { try { await saveFollowup(input); setModal(""); flash(input.id ? "Follow-up reagendado" : "Follow-up agendado"); } catch (error) { flash(errorMessage(error)); } }}/>}
         {modal === "meeting" && <MeetingForm leads={leads} profiles={staffProfiles} lead={activeLead} existing={activeMeeting} currentUserId={user.id} done={async (input) => { try { await saveMeeting(input); setModal(""); flash(input.rescheduledFrom ? "Reunião reagendada" : "Reunião agendada"); } catch (error) { flash(errorMessage(error)); } }}/>}
-        {modal === "user" && <UserForm done={() => { setModal(""); void loadData(); flash("Executivo criado com acesso seguro"); }}/>}
+        {modal === "user" && (
+          <UserForm done={() => { setModal(""); void loadData(); flash("Executivo criado com os acessos selecionados"); }}/>
+        )}
+        {modal === "permissions" && activeExecutive && (
+          <PermissionForm profile={activeExecutive} done={async (permissions, canView) => { const { error } = await supabase.from("profiles").update({ menu_permissions: permissions, can_view_revenue: canView }).eq("id", activeExecutive.id); if (error) { flash(error.message); return; } setModal(""); await loadData(); flash("Permissões atualizadas"); }}/>
+        )}
       </Modal>}
     </div>
   );
@@ -403,22 +423,25 @@ function Title({ page, name, onLead, onClient, onImport, onFollowup, onMeeting }
   return <div className="title"><div><span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(new Date()).toUpperCase()}</span><h1>{data[page]?.[0]}</h1><p>{data[page]?.[1]}</p></div><div className="title-actions">{["Visão geral", "Leads"].includes(page) && <><button className="ghost" onClick={onImport}>⇧ Importar Excel</button><button className="primary" onClick={onLead}>＋ Novo lead</button></>}{page === "Clientes" && <button className="primary" onClick={onClient}>＋ Cadastrar cliente</button>}{page === "Follow-ups" && <button className="primary" onClick={onFollowup}>＋ Agendar follow-up</button>}{page === "Reuniões" && <button className="primary" onClick={onMeeting}>＋ Agendar reunião</button>}</div></div>;
 }
 
-function Dashboard({ leads, meetings, profiles, stats, go }: { leads: Lead[]; meetings: Meeting[]; profiles: Profile[]; stats: { active: number; pipeline: number; revenue: number; conversion: number }; go: (page: string) => void }) {
+function Dashboard({ leads, meetings, profiles, stats, canViewRevenue, go }: { leads: Lead[]; meetings: Meeting[]; profiles: Profile[]; stats: { active: number; pipeline: number; revenue: number; conversion: number }; canViewRevenue: boolean; go: (page: string) => void }) {
   const performance = getPerformance(profiles, leads, meetings);
-  return <><div className="stats">{[["Leads em tratamento", String(stats.active), "Carteira atual", "◎"], ["Pipeline em aberto", money(stats.pipeline), "Valor estimado", "◈"], ["Faturamento ganho", money(stats.revenue), "Contratos ganhos", "↗"], ["Taxa de conversão", `${stats.conversion.toFixed(1)}%`, "Ganho ÷ encerrados", "⌁"]].map((item, index) => <article key={item[0]}><i className={`stat s${index}`}>{item[3]}</i><span><small>{item[0]}</small><b>{item[1]}</b><em>{item[2]}</em></span></article>)}</div><div className="dashboard-grid"><article className="panel"><PanelHead title="Funil comercial" subtitle="Distribuição atual por etapa" action="Ver pipeline →" click={() => go("Pipeline")}/><div className="funnel">{stages.map((stage) => { const count = leads.filter((lead) => lead.stage === stage).length; const width = leads.length ? Math.max(7, count / leads.length * 100) : 7; return <div key={stage}><span>{stage}</span><b><i style={{ width: `${width}%` }}/></b><em>{count}</em></div>; })}</div></article><PerformancePanel rows={performance} compact/></div><article className="panel deals recent"><PanelHead title="Negociações recentes" subtitle="Últimas oportunidades da carteira" action="Ver todas →" click={() => go("Leads")}/>{leads.slice(0, 6).map((lead) => <div key={lead.id}><CompanyCell lead={lead}/><Pill status={lead.stage}/><strong>{money(lead.value)}</strong><span className="owner"><Avatar name={lead.owner}/>{lead.owner}</span><small>{lead.next}</small></div>)}</article></>;
+  const statItems = canViewRevenue
+    ? [["Leads em tratamento", String(stats.active), "Carteira atual", "◎"], ["Pipeline em aberto", money(stats.pipeline), "Valor estimado", "◈"], ["Faturamento ganho", money(stats.revenue), "Contratos ganhos", "↗"], ["Taxa de conversão", `${stats.conversion.toFixed(1)}%`, "Ganho ÷ encerrados", "⌁"]]
+    : [["Leads em tratamento", String(stats.active), "Carteira atual", "◎"], ["Reuniões", String(meetings.length), "Agendamentos registrados", "▣"], ["Contratos ganhos", String(leads.filter((lead) => lead.stage === "Ganho").length), "Fechamentos", "↗"], ["Taxa de conversão", `${stats.conversion.toFixed(1)}%`, "Ganho ÷ encerrados", "⌁"]];
+  return <><div className="stats">{statItems.map((item, index) => <article key={item[0]}><i className={`stat s${index}`}>{item[3]}</i><span><small>{item[0]}</small><b>{item[1]}</b><em>{item[2]}</em></span></article>)}</div><div className="dashboard-grid"><article className="panel"><PanelHead title="Funil comercial" subtitle="Distribuição atual por etapa" action="Ver pipeline →" click={() => go("Pipeline")}/><div className="funnel">{stages.map((stage) => { const count = leads.filter((lead) => lead.stage === stage).length; const width = leads.length ? Math.max(7, count / leads.length * 100) : 7; return <div key={stage}><span>{stage}</span><b><i style={{ width: `${width}%` }}/></b><em>{count}</em></div>; })}</div></article><PerformancePanel rows={performance} compact showRevenue={canViewRevenue}/></div><article className="panel deals recent"><PanelHead title="Negociações recentes" subtitle="Últimas oportunidades da carteira" action="Ver todas →" click={() => go("Leads")}/>{leads.slice(0, 6).map((lead) => <div key={lead.id}><CompanyCell lead={lead}/><Pill status={lead.stage}/><strong>{canViewRevenue ? money(lead.value) : "Valor restrito"}</strong><span className="owner"><Avatar name={lead.owner}/>{lead.owner}</span><small>{lead.next}</small></div>)}</article></>;
 }
 
 function PanelHead({ title, subtitle, action, click }: { title: string; subtitle: string; action?: string; click?: () => void }) { return <div className="head"><span><b>{title}</b><small>{subtitle}</small></span>{action && <button onClick={click}>{action}</button>}</div>; }
 function CompanyCell({ lead }: { lead: Lead }) { return <span className="company"><i>{lead.name[0]}</i><b>{lead.name}<small>{lead.contact}</small></b></span>; }
 
-function Pipeline({ leads, move }: { leads: Lead[]; move: (lead: Lead, stage: string) => void }) {
+function Pipeline({ leads, canViewRevenue, move }: { leads: Lead[]; canViewRevenue: boolean; move: (lead: Lead, stage: string) => void }) {
   const [dropTarget, setDropTarget] = useState("");
   const drop = (stage: string, id: string) => { const lead = leads.find((item) => item.id === id); setDropTarget(""); if (lead) void move(lead, stage); };
-  return <><div className="kanban-tip">↔ Arraste lateralmente para navegar · Arraste um card para mudar de etapa</div><div className="kanban">{stages.map((stage) => <section className={`kanban-column ${dropTarget === stage ? "drop-target" : ""}`} key={stage} onDragOver={(event) => { event.preventDefault(); setDropTarget(stage); }} onDragLeave={() => setDropTarget("")} onDrop={(event) => drop(stage, event.dataTransfer.getData("text/lead-id"))}><header><i/>{stage}<em>{leads.filter((lead) => lead.stage === stage).length}</em></header>{leads.filter((lead) => lead.stage === stage).map((lead) => <article draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/lead-id", lead.id); }} key={lead.id}><div className="kanban-card-top"><span className="logo">{lead.name[0]}</span><small>{lead.service}</small></div><h4>{lead.name}</h4><p>{lead.contact}</p><b>{money(lead.value)}</b><footer><span className="owner"><Avatar name={lead.owner}/>{lead.owner}</span><span>◷ {lead.next}</span></footer><select aria-label={`Etapa de ${lead.name}`} value={lead.stage} onChange={(event) => void move(lead, event.target.value)}>{stages.map((item) => <option key={item}>{item}</option>)}</select></article>)}</section>)}</div></>;
+  return <><div className="kanban-tip">↔ Arraste lateralmente para navegar · Arraste um card para mudar de etapa</div><div className="kanban">{stages.map((stage) => <section className={`kanban-column ${dropTarget === stage ? "drop-target" : ""}`} key={stage} onDragOver={(event) => { event.preventDefault(); setDropTarget(stage); }} onDragLeave={() => setDropTarget("")} onDrop={(event) => drop(stage, event.dataTransfer.getData("text/lead-id"))}><header><i/>{stage}<em>{leads.filter((lead) => lead.stage === stage).length}</em></header>{leads.filter((lead) => lead.stage === stage).map((lead) => <article draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/lead-id", lead.id); }} key={lead.id}><div className="kanban-card-top"><span className="logo">{lead.name[0]}</span><small>{lead.service}</small></div><h4>{lead.name}</h4><p>{lead.contact}</p><b>{canViewRevenue ? money(lead.value) : "Valor restrito"}</b><footer><span className="owner"><Avatar name={lead.owner}/>{lead.owner}</span><span>◷ {lead.next}</span></footer><select aria-label={`Etapa de ${lead.name}`} value={lead.stage} onChange={(event) => void move(lead, event.target.value)}>{stages.map((item) => <option key={item}>{item}</option>)}</select></article>)}</section>)}</div></>;
 }
 
-function LeadList({ leads }: { leads: Lead[] }) {
-  return <article className="panel lead-table"><header><span>EMPRESA / CONTATO</span><span>CONTATOS</span><span>LOCALIZAÇÃO</span><span>ETAPA / VALOR</span><span>RESPONSÁVEL</span></header>{leads.map((lead) => <div key={lead.id}><CompanyCell lead={lead}/><span className="contact-stack"><b>{lead.phone || "Sem telefone"}</b><small>{lead.email || lead.contactEmail || "Sem e-mail"}</small><small>{lead.cnpj || "CNPJ não informado"}</small></span><span>{lead.address || "Não informada"}</span><span><Pill status={lead.stage}/><strong>{money(lead.value)}</strong></span><span className="owner"><Avatar name={lead.owner}/>{lead.owner}</span></div>)}</article>;
+function LeadList({ leads, canViewRevenue }: { leads: Lead[]; canViewRevenue: boolean }) {
+  return <article className="panel lead-table"><header><span>EMPRESA / CONTATO</span><span>CONTATOS</span><span>LOCALIZAÇÃO</span><span>{canViewRevenue ? "ETAPA / VALOR" : "ETAPA"}</span><span>RESPONSÁVEL</span></header>{leads.map((lead) => <div key={lead.id}><CompanyCell lead={lead}/><span className="contact-stack"><b>{lead.phone || "Sem telefone"}</b><small>{lead.email || lead.contactEmail || "Sem e-mail"}</small><small>{lead.cnpj || "CNPJ não informado"}</small></span><span>{lead.address || "Não informada"}</span><span><Pill status={lead.stage}/>{canViewRevenue && <strong>{money(lead.value)}</strong>}</span><span className="owner"><Avatar name={lead.owner}/>{lead.owner}</span></div>)}</article>;
 }
 
 function FollowupsView({ followups, onComplete, onEdit }: { followups: Followup[]; onComplete: (item: Followup) => void; onEdit: (item: Followup) => void }) {
@@ -446,15 +469,18 @@ function getPerformance(profiles: Profile[], leads: Lead[], meetings: Meeting[])
   }).sort((a, b) => b.won - a.won || b.meetings - a.meetings);
 }
 
-function PerformancePanel({ rows, compact = false }: { rows: PerformanceRow[]; compact?: boolean }) {
+function PerformancePanel({ rows, compact = false, showRevenue = true }: { rows: PerformanceRow[]; compact?: boolean; showRevenue?: boolean }) {
   const maxMeetings = Math.max(...rows.map((row) => row.meetings), 1); const maxWon = Math.max(...rows.map((row) => row.won), 1);
-  return <article className={`panel performance ${compact ? "compact-performance" : ""}`}><PanelHead title="Desempenho dos executivos" subtitle="Agendamentos e contratos fechados"/>{rows.length ? rows.map((row, index) => <div className="performance-row" key={row.id}><span className="rank">{index + 1}</span><span className="owner"><Avatar name={row.name}/><b>{row.name}</b></span><span><small>Reuniões</small><b>{row.meetings}</b><i><em style={{ width: `${row.meetings / maxMeetings * 100}%` }}/></i></span><span><small>Contratos</small><b>{row.won}</b><i className="green-bar"><em style={{ width: `${row.won / maxWon * 100}%` }}/></i></span>{!compact && <><span><small>Faturamento</small><b>{money(row.revenue)}</b></span><span><small>Conversão</small><b>{row.conversion.toFixed(1)}%</b></span></>}</div>) : <Empty title="Cadastre executivos" text="O ranking aparece assim que a equipe começar a trabalhar os leads."/>}</article>;
+  return <article className={`panel performance ${compact ? "compact-performance" : ""}`}><PanelHead title="Desempenho dos executivos" subtitle="Agendamentos e contratos fechados"/>{rows.length ? rows.map((row, index) => <div className="performance-row" key={row.id}><span className="rank">{index + 1}</span><span className="owner"><Avatar name={row.name}/><b>{row.name}</b></span><span><small>Reuniões</small><b>{row.meetings}</b><i><em style={{ width: `${row.meetings / maxMeetings * 100}%` }}/></i></span><span><small>Contratos</small><b>{row.won}</b><i className="green-bar"><em style={{ width: `${row.won / maxWon * 100}%` }}/></i></span>{!compact && <>{showRevenue && <span><small>Faturamento</small><b>{money(row.revenue)}</b></span>}<span><small>Conversão</small><b>{row.conversion.toFixed(1)}%</b></span></>}</div>) : <Empty title="Cadastre executivos" text="O ranking aparece assim que a equipe começar a trabalhar os leads."/>}</article>;
 }
 
 function Proposals({ leads }: { leads: Lead[] }) { const sent = leads.filter((lead) => ["Proposta enviada", "Negociação", "Ganho"].includes(lead.stage)); return <><div className="stats compact">{[["Em elaboração", "0"], ["Enviadas", String(sent.length)], ["Aprovadas", String(leads.filter((lead) => lead.stage === "Ganho").length)], ["Aguardando retorno", String(leads.filter((lead) => lead.stage === "Proposta enviada").length)]].map((item, index) => <article key={item[0]}><i className={`stat s${index}`}>▤</i><span><small>{item[0]}</small><b>{item[1]}</b></span></article>)}</div><EmptyPanel title="Orçamentos conectados ao cadastro" text="Os serviços estão cadastrados e cada orçamento pode ficar vinculado à empresa."/></>; }
-function Clients({ leads, onAdd }: { leads: Lead[]; onAdd: () => void }) { if (!leads.length) return <EmptyPanel title="Nenhum cliente cadastrado ainda" text="Cadastre diretamente por esta aba ou mova um lead para Ganho." action="Cadastrar cliente" click={onAdd}/>; return <div className="cards">{leads.map((lead) => <article className="panel client-card" key={lead.id}><div><i>{lead.name[0]}</i><Pill status="Ativo"/></div><h2>{lead.name}</h2><p>{lead.service}</p><strong>{money(lead.value)}</strong><hr/><small>Executivo responsável</small><b className="owner"><Avatar name={lead.owner}/>{lead.owner}</b><small>{lead.email || lead.phone}</small><button>Abrir ficha do cliente →</button></article>)}</div>; }
+function Clients({ leads, canViewRevenue, onAdd }: { leads: Lead[]; canViewRevenue: boolean; onAdd: () => void }) { if (!leads.length) return <EmptyPanel title="Nenhum cliente cadastrado ainda" text="Cadastre diretamente por esta aba ou mova um lead para Ganho." action="Cadastrar cliente" click={onAdd}/>; return <div className="cards">{leads.map((lead) => <article className="panel client-card" key={lead.id}><div><i>{lead.name[0]}</i><Pill status="Ativo"/></div><h2>{lead.name}</h2><p>{lead.service}</p>{canViewRevenue && <strong>{money(lead.value)}</strong>}<hr/><small>Executivo responsável</small><b className="owner"><Avatar name={lead.owner}/>{lead.owner}</b><small>{lead.email || lead.phone}</small><button>Abrir ficha do cliente →</button></article>)}</div>; }
 function Tickets() { return <EmptyPanel title="Central de chamados pronta" text="Clientes autenticados podem abrir chamados vinculados à própria empresa."/>; }
-function Team({ profiles, leads, meetings, onAdd }: { profiles: Profile[]; leads: Lead[]; meetings: Meeting[]; onAdd: () => void }) { return <><div className="section-actions"><button className="primary" onClick={onAdd}>＋ Cadastrar executivo</button></div><PerformancePanel rows={getPerformance(profiles, leads, meetings)}/></>; }
+function Team({ profiles, leads, meetings, onAdd, onEdit }: { profiles: Profile[]; leads: Lead[]; meetings: Meeting[]; onAdd: () => void; onEdit: (profile: Profile) => void }) {
+  const executives = profiles.filter((item) => item.role === "executive");
+  return <><div className="section-actions"><button className="primary" onClick={onAdd}>＋ Cadastrar executivo</button></div>{executives.length > 0 && <div className="agent-access-grid">{executives.map((executive) => <article className="panel agent-access-card" key={executive.id}><div><Avatar name={executive.full_name || executive.email}/><span><b>{executive.full_name || executive.email}</b><small>{executive.email}</small></span><Pill status={executive.active ? "Ativo" : "Inativo"}/></div><p>{executive.menu_permissions.length} módulos liberados</p><div className="permission-tags">{executive.menu_permissions.map((item) => <span key={item}>{item}</span>)}</div><b className={executive.can_view_revenue ? "financial-yes" : "financial-no"}>{executive.can_view_revenue ? "✓ Visualiza valores e faturamento" : "⊘ Valores financeiros ocultos"}</b><button className="ghost" onClick={() => onEdit(executive)}>Editar acessos</button></article>)}</div>}<PerformancePanel rows={getPerformance(profiles, leads, meetings)}/></>;
+}
 
 function Chat({ profile }: { profile: Profile }) {
   const [messages, setMessages] = useState<{ id: string; body: string; sender_id: string; created_at: string }[]>([]); const [value, setValue] = useState("");
@@ -470,12 +496,12 @@ function Modal({ children, close }: { children: ReactNode; close: () => void }) 
 function Empty({ title, text }: { title: string; text: string }) { return <div className="empty"><b>{title}</b><p>{text}</p></div>; }
 function EmptyPanel({ title, text, action, click }: { title: string; text: string; action?: string; click?: () => void }) { return <article className="panel empty-state"><b>{title}</b><p>{text}</p>{action && <button className="primary" onClick={click}>{action}</button>}</article>; }
 
-function CompanyForm({ services, profiles, currentUserId, initialStage, done }: { services: Service[]; profiles: Profile[]; currentUserId: string; initialStage: string; done: (input: NewCompanyInput) => Promise<void> }) {
+function CompanyForm({ services, profiles, currentUserId, canViewRevenue, initialStage, done }: { services: Service[]; profiles: Profile[]; currentUserId: string; canViewRevenue: boolean; initialStage: string; done: (input: NewCompanyInput) => Promise<void> }) {
   const [form, setForm] = useState<NewCompanyInput>({ name: "", legalName: "", cnpj: "", email: "", phone: "", address: "", contact: "", contactEmail: "", contactPhone: "", serviceId: services[0]?.id ?? "", ownerId: profiles[0]?.id ?? currentUserId, value: 0, source: "Manual", stage: initialStage });
   const [busy, setBusy] = useState(false);
   const field = (key: keyof NewCompanyInput, value: string | number) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async () => { if (!form.name || !form.contact) return; setBusy(true); try { await done(form); } finally { setBusy(false); } };
-  return <><label className="tag">{initialStage === "Ganho" ? "NOVO CLIENTE" : "NOVO LEAD"}</label><h2>{initialStage === "Ganho" ? "Cadastrar cliente" : "Cadastrar lead"}</h2><p>Dados completos da empresa, contato e oportunidade.</p><div className="form form-3"><label>Nome da empresa *<input value={form.name} onChange={(event) => field("name", event.target.value)} placeholder="Nome fantasia"/></label><label>Razão social<input value={form.legalName} onChange={(event) => field("legalName", event.target.value)} placeholder="Razão social"/></label><label>CNPJ<input value={form.cnpj} onChange={(event) => field("cnpj", event.target.value)} placeholder="00.000.000/0001-00"/></label><label>E-mail da empresa<input type="email" value={form.email} onChange={(event) => field("email", event.target.value)} placeholder="contato@empresa.com.br"/></label><label>Telefone da empresa<input value={form.phone} onChange={(event) => field("phone", event.target.value)} placeholder="(11) 99999-9999"/></label><label>Localização<input value={form.address} onChange={(event) => field("address", event.target.value)} placeholder="Cidade/UF ou endereço"/></label><label>Contato principal *<input value={form.contact} onChange={(event) => field("contact", event.target.value)} placeholder="Nome completo"/></label><label>E-mail do contato<input type="email" value={form.contactEmail} onChange={(event) => field("contactEmail", event.target.value)}/></label><label>Telefone do contato<input value={form.contactPhone} onChange={(event) => field("contactPhone", event.target.value)}/></label><label>Executivo<select value={form.ownerId} onChange={(event) => field("ownerId", event.target.value)}>{profiles.map((item) => <option value={item.id} key={item.id}>{item.full_name || item.email}</option>)}</select></label><label>Serviço<select value={form.serviceId} onChange={(event) => field("serviceId", event.target.value)}>{services.map((service) => <option value={service.id} key={service.id}>{service.name}</option>)}</select></label><label>Valor estimado<input type="number" min="0" value={form.value} onChange={(event) => field("value", Number(event.target.value))}/></label><label>Origem<select value={form.source} onChange={(event) => field("source", event.target.value)}><option>Manual</option><option>Indicação</option><option>Site</option><option>Instagram</option><option>Google</option><option>Prospecção</option></select></label><label>Etapa<select value={form.stage} onChange={(event) => field("stage", event.target.value)}>{directRegistrationStages.map((stage) => <option key={stage}>{stage}</option>)}</select></label></div><small className="form-hint">Follow-up e Reunião marcada são definidos no Kanban para exigir responsável e data.</small><button className="primary full" disabled={busy || !form.name || !form.contact} onClick={() => void submit()}>{busy ? "Salvando..." : initialStage === "Ganho" ? "Cadastrar cliente" : "Cadastrar lead"}</button></>;
+  return <><label className="tag">{initialStage === "Ganho" ? "NOVO CLIENTE" : "NOVO LEAD"}</label><h2>{initialStage === "Ganho" ? "Cadastrar cliente" : "Cadastrar lead"}</h2><p>Dados completos da empresa, contato e oportunidade.</p><div className="form form-3"><label>Nome da empresa *<input value={form.name} onChange={(event) => field("name", event.target.value)} placeholder="Nome fantasia"/></label><label>Razão social<input value={form.legalName} onChange={(event) => field("legalName", event.target.value)} placeholder="Razão social"/></label><label>CNPJ<input value={form.cnpj} onChange={(event) => field("cnpj", event.target.value)} placeholder="00.000.000/0001-00"/></label><label>E-mail da empresa<input type="email" value={form.email} onChange={(event) => field("email", event.target.value)} placeholder="contato@empresa.com.br"/></label><label>Telefone da empresa<input value={form.phone} onChange={(event) => field("phone", event.target.value)} placeholder="(11) 99999-9999"/></label><label>Localização<input value={form.address} onChange={(event) => field("address", event.target.value)} placeholder="Cidade/UF ou endereço"/></label><label>Contato principal *<input value={form.contact} onChange={(event) => field("contact", event.target.value)} placeholder="Nome completo"/></label><label>E-mail do contato<input type="email" value={form.contactEmail} onChange={(event) => field("contactEmail", event.target.value)}/></label><label>Telefone do contato<input value={form.contactPhone} onChange={(event) => field("contactPhone", event.target.value)}/></label><label>Executivo<select value={form.ownerId} onChange={(event) => field("ownerId", event.target.value)}>{profiles.map((item) => <option value={item.id} key={item.id}>{item.full_name || item.email}</option>)}</select></label><label>Serviço<select value={form.serviceId} onChange={(event) => field("serviceId", event.target.value)}>{services.map((service) => <option value={service.id} key={service.id}>{service.name}</option>)}</select></label>{canViewRevenue && <label>Valor estimado<input type="number" min="0" value={form.value} onChange={(event) => field("value", Number(event.target.value))}/></label>}<label>Origem<select value={form.source} onChange={(event) => field("source", event.target.value)}><option>Manual</option><option>Indicação</option><option>Site</option><option>Instagram</option><option>Google</option><option>Prospecção</option></select></label><label>Etapa<select value={form.stage} onChange={(event) => field("stage", event.target.value)}>{directRegistrationStages.map((stage) => <option key={stage}>{stage}</option>)}</select></label></div><small className="form-hint">Follow-up e Reunião marcada são definidos no Kanban para exigir responsável e data.</small><button className="primary full" disabled={busy || !form.name || !form.contact} onClick={() => void submit()}>{busy ? "Salvando..." : initialStage === "Ganho" ? "Cadastrar cliente" : "Cadastrar lead"}</button></>;
 }
 
 function FollowupForm({ leads, profiles, lead, existing, currentUserId, done }: { leads: Lead[]; profiles: Profile[]; lead: Lead | null; existing: Followup | null; currentUserId: string; done: (input: FollowupInput) => Promise<void> }) {
@@ -506,7 +532,18 @@ function ImportModal({ onImport, onDone }: { onImport: (records: ImportRecord[],
 }
 
 function UserForm({ done }: { done: () => void }) {
-  const [fullName, setFullName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const submit = async () => { setBusy(true); setError(""); const { error: invokeError } = await supabase.functions.invoke("admin-create-user", { body: { full_name: fullName, email, password, role: "executive" } }); setBusy(false); if (invokeError) { setError(invokeError.message); return; } done(); };
-  return <><label className="tag">EQUIPE COMERCIAL</label><h2>Cadastrar executivo</h2><p>Crie um acesso individual para rastrear leads, reuniões e contratos.</p><label>Nome completo<input value={fullName} onChange={(event) => setFullName(event.target.value)} required/></label><label>E-mail<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required/></label><label>Senha temporária<input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 8 caracteres" required/></label>{error && <div className="auth-error">{error}</div>}<button className="primary full" onClick={() => void submit()} disabled={busy || !fullName || !email || password.length < 8}>{busy ? "Criando..." : "Criar acesso seguro"}</button></>;
+  const [fullName, setFullName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [menus, setMenus] = useState<string[]>(agentMenuOptions); const [canViewRevenue, setCanViewRevenue] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const submit = async () => { setBusy(true); setError(""); const { error: invokeError } = await supabase.functions.invoke("admin-create-user", { body: { full_name: fullName, email, password, role: "executive", menu_permissions: menus, can_view_revenue: canViewRevenue } }); setBusy(false); if (invokeError) { setError(invokeError.message); return; } done(); };
+  return <><label className="tag">EQUIPE COMERCIAL</label><h2>Cadastrar executivo</h2><p>Crie um acesso individual e escolha exatamente o que este usuário poderá visualizar.</p><div className="form"><label>Nome completo<input value={fullName} onChange={(event) => setFullName(event.target.value)} required/></label><label>E-mail<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required/></label></div><label>Senha temporária<input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 8 caracteres" required/></label><AccessFields menus={menus} setMenus={setMenus} canViewRevenue={canViewRevenue} setCanViewRevenue={setCanViewRevenue}/>{error && <div className="auth-error">{error}</div>}<button className="primary full" onClick={() => void submit()} disabled={busy || !fullName || !email || password.length < 8 || menus.length === 0}>{busy ? "Criando..." : "Criar executivo com estes acessos"}</button></>;
+}
+
+function PermissionForm({ profile, done }: { profile: Profile; done: (permissions: string[], canViewRevenue: boolean) => Promise<void> }) {
+  const [menus, setMenus] = useState<string[]>(profile.menu_permissions); const [canViewRevenue, setCanViewRevenue] = useState(profile.can_view_revenue); const [busy, setBusy] = useState(false);
+  const submit = async () => { setBusy(true); try { await done(menus, canViewRevenue); } finally { setBusy(false); } };
+  return <><label className="tag">CONTROLE DE ACESSO</label><h2>Editar acessos de {profile.full_name || profile.email}</h2><p>{profile.email}</p><AccessFields menus={menus} setMenus={setMenus} canViewRevenue={canViewRevenue} setCanViewRevenue={setCanViewRevenue}/><button className="primary full" onClick={() => void submit()} disabled={busy || menus.length === 0}>{busy ? "Salvando..." : "Salvar permissões"}</button></>;
+}
+
+function AccessFields({ menus, setMenus, canViewRevenue, setCanViewRevenue }: { menus: string[]; setMenus: (menus: string[]) => void; canViewRevenue: boolean; setCanViewRevenue: (value: boolean) => void }) {
+  const toggle = (item: string) => setMenus(menus.includes(item) ? menus.filter((menu) => menu !== item) : [...menus, item]);
+  return <div className="access-fields"><div className="access-heading"><span><b>Menus liberados</b><small>Marque as funções que aparecerão na lateral do sistema.</small></span><button type="button" onClick={() => setMenus(menus.length === agentMenuOptions.length ? [] : agentMenuOptions)}>{menus.length === agentMenuOptions.length ? "Desmarcar todos" : "Marcar todos"}</button></div><div className="permission-grid">{agentMenuOptions.map((item) => <label className={menus.includes(item) ? "selected" : ""} key={item}><input type="checkbox" checked={menus.includes(item)} onChange={() => toggle(item)}/><i>{navIcons[item]}</i><span>{item}</span><b>✓</b></label>)}</div><label className={`financial-toggle ${canViewRevenue ? "selected" : ""}`}><input type="checkbox" checked={canViewRevenue} onChange={(event) => setCanViewRevenue(event.target.checked)}/><span><b>Acesso aos valores financeiros</b><small>Permite visualizar faturamento, valores do pipeline, contratos e campos de orçamento.</small></span><i>{canViewRevenue ? "Liberado" : "Bloqueado"}</i></label><small className="access-summary">{menus.length} de {agentMenuOptions.length} menus selecionados · valores financeiros {canViewRevenue ? "liberados" : "ocultos"}</small></div>;
 }

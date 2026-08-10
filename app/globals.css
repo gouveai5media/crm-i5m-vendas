@@ -85,3 +85,46 @@
 @media(max-width:850px){.mini-stats{grid-template-columns:1fr 1fr}.meeting-filters{align-items:stretch;flex-direction:column}.meeting-filters label{width:100%;min-width:0}.activity-list,.meeting-list{overflow:auto}.activity-list>div{min-width:760px}.meeting-list>div{min-width:900px}.performance{overflow:auto}.performance-row{min-width:760px}.compact-performance .performance-row{min-width:580px}.form-3{grid-template-columns:1fr}}
 @media(max-width:720px){.title{display:block}.title-actions{justify-content:flex-start;margin-top:16px}.title .ghost{display:inline-flex}.kanban{grid-auto-columns:255px}.kanban-column{min-height:520px}.mini-stats{grid-template-columns:1fr 1fr}.modal{padding:23px 18px}}
 @media(max-width:450px){.mini-stats{grid-template-columns:1fr}.title-actions button{flex:1}.dashboard-grid{display:block}.dashboard-grid>.panel+*{margin-top:14px}}
+
+/* Executive access control */
+.agent-access-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.agent-access-card{padding:18px}
+.agent-access-card>div:first-child{display:flex;align-items:center;gap:9px}
+.agent-access-card>div:first-child>span{min-width:0;flex:1}
+.agent-access-card>div:first-child>span b,.agent-access-card>div:first-child>span small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-access-card>div:first-child>span b{font-size:10px}
+.agent-access-card>div:first-child>span small{margin-top:3px;color:#9ba1ae;font-size:7px}
+.agent-access-card>p{margin:15px 0 8px;color:#687184;font-size:9px;font-weight:700}
+.permission-tags{display:flex;gap:5px;flex-wrap:wrap;min-height:48px}
+.permission-tags span{padding:5px 7px;border-radius:7px;background:#f1efff;color:#6751d4;font-size:7px}
+.agent-access-card>.financial-yes,.agent-access-card>.financial-no{display:block;margin:13px 0 5px;font-size:8px}
+.financial-yes{color:#12976d}.financial-no{color:#c44c62}
+.agent-access-card>.ghost{width:100%;margin-top:10px}
+.access-fields{margin-top:18px}
+.access-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:10px}
+.access-heading span b,.access-heading span small{display:block}
+.access-heading span b{font-size:11px;color:#394257}
+.access-heading span small{margin-top:4px;color:#8f96a5;font-size:8px}
+.access-heading button{border:0;background:none;color:var(--p);font-size:8px;font-weight:800}
+.permission-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.permission-grid label{height:45px;border:1px solid #e2e5eb;border-radius:9px;display:flex;align-items:center;gap:9px;padding:0 11px;color:#687184;font-size:8px;font-weight:700;cursor:pointer;transition:.16s ease}
+.permission-grid label:hover{border-color:#cfc6fa;background:#faf9ff}
+.permission-grid label.selected{border-color:#9f8cf1;background:#f1eeff;color:#6148d1;box-shadow:0 0 0 2px #8269ed12}
+.permission-grid input,.financial-toggle input{position:absolute;opacity:0;pointer-events:none}
+.permission-grid label>i{font-style:normal;font-size:15px}
+.permission-grid label>span{flex:1}
+.permission-grid label>b{width:18px;height:18px;border:1px solid #d8dce5;border-radius:5px;display:grid;place-items:center;color:transparent;font-size:9px}
+.permission-grid label.selected>b{border-color:var(--p);background:var(--p);color:#fff}
+.financial-toggle{display:flex!important;align-items:center;gap:12px;margin-top:13px!important;padding:14px;border:1px solid #e0e3e9;border-radius:10px;background:#fafbfc;cursor:pointer}
+.financial-toggle.selected{border-color:#8bd7bf;background:#ecfaf5}
+.financial-toggle>span{flex:1}
+.financial-toggle>span b,.financial-toggle>span small{display:block}
+.financial-toggle>span b{font-size:10px;color:#384154}
+.financial-toggle>span small{margin-top:4px;color:#8b93a1;font-size:8px;line-height:1.45}
+.financial-toggle>i{padding:6px 9px;border-radius:8px;background:#fff0f2;color:#c44c62;font-size:7px;font-style:normal;font-weight:800}
+.financial-toggle.selected>i{background:#dff6ed;color:#108d65}
+.access-summary{display:block;margin-top:9px;color:#8d94a2;font-size:8px}
+
+@media(max-width:1150px){.agent-access-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:780px){.agent-access-grid{grid-template-columns:1fr}.permission-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:500px){.permission-grid{grid-template-columns:1fr}.access-heading{align-items:flex-start;flex-direction:column}.financial-toggle{align-items:flex-start;flex-wrap:wrap}.financial-toggle>i{margin-left:auto}}
