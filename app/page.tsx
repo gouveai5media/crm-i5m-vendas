@@ -1,31 +1,467 @@
 "use client";
-import {useState} from "react";
-const nav=["Visão geral","Leads","Pipeline","Follow-ups","Propostas","Clientes","Chamados","Equipe","Chat interno"];
-const stages=["Novo lead","Primeiro contato","Reunião marcada","Proposta enviada","Negociação"];
-const seed=[
- {name:"Forro Novo",contact:"Carlos Mendes",service:"Tráfego pago",value:4800,stage:"Novo lead",owner:"Matheus",next:"Hoje, 15:30"},
- {name:"IntegraCare MV",contact:"Mariana Lopes",service:"Site institucional",value:7500,stage:"Primeiro contato",owner:"Ana Costa",next:"Amanhã, 10:00"},
- {name:"IMUNA Blindagens",contact:"Ricardo Alves",service:"Sistema web",value:18500,stage:"Reunião marcada",owner:"Matheus",next:"12 ago, 14:00"},
- {name:"FM Personalizados",contact:"Fernanda Melo",service:"Identidade visual",value:6200,stage:"Proposta enviada",owner:"Lucas Lima",next:"13 ago, 09:00"},
- {name:"Deubom Sports",contact:"André Santos",service:"Aplicativo",value:24000,stage:"Negociação",owner:"Ana Costa",next:"Hoje, 17:00"},
- {name:"Thiago Consultoria",contact:"Thiago de Paula",service:"Site + hospedagem",value:9800,stage:"Proposta enviada",owner:"Matheus",next:"14 ago, 11:30"}
-];
-const money=(n:number)=>n.toLocaleString("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
-const tone=(s:string)=>s.includes("Negociação")?"green":s.includes("Reunião")?"orange":s.includes("Proposta")?"blue":"purple";
-export default function App(){const [page,setPage]=useState("Visão geral"),[leads,setLeads]=useState(seed),[modal,setModal]=useState(""),[toast,setToast]=useState("");const flash=(x:string)=>{setToast(x);setTimeout(()=>setToast(""),2500)};return <div className="shell"><aside><div className="brand"><b>i5</b><span><strong>I5MEDIA</strong><small>Sales Hub</small></span></div><nav>{nav.map((n,i)=><button className={page===n?"active":""} onClick={()=>setPage(n)} key={n}><i>{["▦","◎","▥","◷","▤","♙","◈","♚","◌"][i]}</i>{n}{n==="Chamados"&&<em>4</em>}</button>)}</nav><div className="storage"><span>Armazenamento <b>68%</b></span><progress value="68" max="100"/><small>6,8 GB de 10 GB utilizados</small></div></aside><main><header><div className="search">⌕ <input placeholder="Buscar empresa, contato ou CNPJ..."/><kbd>⌘ K</kbd></div><button className="bell">♢<i/></button><div className="user"><Avatar n="Matheus Gouvea"/><span><b>Matheus Gouvea</b><small>Super administrador</small></span>⌄</div></header><section><Title page={page} add={()=>setModal("lead")} imp={()=>setModal("import")}/>{page==="Visão geral"&&<Dashboard leads={leads} go={setPage}/>} {page==="Pipeline"&&<Pipeline leads={leads} move={(name,stage)=>{setLeads(leads.map(l=>l.name===name?{...l,stage}:l));flash("Etapa atualizada com sucesso")}}/>}{page==="Leads"&&<LeadList leads={leads}/>} {page==="Follow-ups"&&<Follow leads={leads}/>} {page==="Propostas"&&<Proposals/>}{page==="Clientes"&&<Clients/>}{page==="Chamados"&&<Tickets/>}{page==="Equipe"&&<Team/>}{page==="Chat interno"&&<Chat/>}</section></main><button className="float" onClick={()=>setPage("Chat interno")}>◌<span>3</span></button>{toast&&<div className="toast">✓ {toast}</div>}{modal&&<Modal close={()=>setModal("")}>{modal==="import"?<Import done={()=>{setModal("");flash("47 contatos importados; 3 duplicados ignorados")}}/>:<LeadForm done={(l:any)=>{setLeads([l,...leads]);setModal("");flash("Lead cadastrado e atribuído")}}/>}</Modal>}</div>}
-function Avatar({n}:{n:string}){return <i className="avatar">{n.split(" ").map(x=>x[0]).slice(0,2).join("")}</i>}
-function Title({page,add,imp}:{page:string,add:()=>void,imp:()=>void}){const data:any={"Visão geral":["Olá, Matheus! 👋","Aqui está o panorama comercial da sua agência hoje."],Leads:["Leads e contatos","Toda a base comercial da agência em um só lugar."],Pipeline:["Pipeline de vendas","Acompanhe cada oportunidade até o fechamento."],"Follow-ups":["Follow-ups e agenda","Nenhuma oportunidade fica esquecida."],Propostas:["Propostas e orçamentos","Crie, envie e acompanhe propostas comerciais."],Clientes:["Clientes","Contratos, acessos e relacionamento em um só lugar."],Chamados:["Chamados dos clientes","Centralize as solicitações após o fechamento."],Equipe:["Equipe comercial","Metas, carteiras e produtividade."],"Chat interno":["Chat interno","Conversas privadas e canais da equipe."]};return <div className="title"><div><span>SEGUNDA-FEIRA, 10 DE AGOSTO</span><h1>{data[page][0]}</h1><p>{data[page][1]}</p></div>{["Visão geral","Leads"].includes(page)&&<div><button className="ghost" onClick={imp}>⇧ Importar Excel</button><button className="primary" onClick={add}>＋ Novo lead</button></div>}</div>}
-function Dashboard({leads,go}:{leads:any[],go:(x:string)=>void}){return <><div className="stats">{[["Leads em tratamento","128","+12,5%","◎"],["Pipeline em aberto","R$ 184.500","+8,2%","◈"],["Faturamento no mês","R$ 76.800","+18,4%","↗"],["Taxa de conversão","24,8%","+3,1%","⌁"]].map((s,i)=><article key={s[0]}><i className={`stat s${i}`}>{s[3]}</i><span><small>{s[0]}</small><b>{s[1]}</b><em>↗ {s[2]} <small>vs. mês anterior</small></em></span></article>)}</div><div className="two"><article className="panel"><Head t="Desempenho comercial" s="Evolução dos últimos 6 meses" a="Últimos 6 meses⌄"/><div className="chart"><svg viewBox="0 0 600 220" preserveAspectRatio="none"><defs><linearGradient id="a" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#735bea" stopOpacity=".3"/><stop offset="1" stopColor="#735bea" stopOpacity="0"/></linearGradient></defs><path className="area" d="M0 180 C70 165 80 145 125 130 S190 150 245 95 S320 115 370 70 S450 90 500 40 S560 65 600 20 L600 220 L0 220Z"/><path className="line" d="M0 180 C70 165 80 145 125 130 S190 150 245 95 S320 115 370 70 S450 90 500 40 S560 65 600 20"/></svg><div>{["Mar","Abr","Mai","Jun","Jul","Ago"].map(x=><span key={x}>{x}</span>)}</div></div></article><article className="panel"><Head t="Funil de vendas" s="Distribuição por etapa" a="Ver pipeline →" click={()=>go("Pipeline")}/><div className="funnel">{stages.map((s,i)=><div key={s}><span>{s}</span><b><i style={{width:`${100-i*16}%`}}/></b><em>{38-i*6}</em></div>)}</div><div className="conversion"><span>Taxa de conversão geral</span><b>24,8% <em>↗ 3,1%</em></b></div></article></div><div className="lower"><article className="panel deals"><Head t="Negociações recentes" s="Últimas movimentações no pipeline" a="Ver todas →" click={()=>go("Leads")}/>{leads.slice(0,5).map(l=><div key={l.name}><span className="company"><i>{l.name[0]}</i><b>{l.name}<small>{l.service}</small></b></span><Pill s={l.stage}/><strong>{money(l.value)}</strong><span className="owner"><Avatar n={l.owner}/>{l.owner}</span><small>{l.next}</small></div>)}</article><article className="panel agenda"><Head t="Agenda de hoje" s="4 atividades pendentes" a="Ver agenda →" click={()=>go("Follow-ups")}/>{leads.slice(0,4).map((l,i)=><div key={l.name}><b>{["09:30","11:00","14:00","17:00"][i]}</b><i/><span><Pill s={i%2?"Reunião":"Follow-up"}/><strong>{l.name}</strong><small>{i%2?"Reunião comercial":"Retorno pelo WhatsApp"}</small></span></div>)}</article></div></>}
-function Head({t,s,a,click}:{t:string,s:string,a:string,click?:()=>void}){return <div className="head"><span><b>{t}</b><small>{s}</small></span><button onClick={click}>{a}</button></div>}
-function Pill({s}:{s:string}){return <span className={`pill ${tone(s)}`}>{s}</span>}
-function Pipeline({leads,move}:{leads:any[],move:(a:string,b:string)=>void}){return <div className="kanban">{stages.map((s,i)=><div key={s}><h3><i/>{s}<em>{leads.filter(l=>l.stage===s).length}</em></h3>{leads.filter(l=>l.stage===s).map(l=><article key={l.name}><span className="logo">{l.name[0]}</span><small>{l.service}</small><h4>{l.name}</h4><p>{l.contact}</p><b>{money(l.value)}</b><footer><Avatar n={l.owner}/><span>◷ {l.next}</span></footer>{i<4&&<button onClick={()=>move(l.name,stages[i+1])}>Avançar →</button>}</article>)}</div>)}</div>}
-function LeadList({leads}:{leads:any[]}){return <article className="panel table"><header><span>EMPRESA / CONTATO</span><span>SERVIÇO</span><span>ETAPA</span><span>VALOR</span><span>RESPONSÁVEL</span></header>{leads.map(l=><div key={l.name}><span className="company"><i>{l.name[0]}</i><b>{l.name}<small>{l.contact}</small></b></span><span>{l.service}</span><Pill s={l.stage}/><strong>{money(l.value)}</strong><span className="owner"><Avatar n={l.owner}/>{l.owner}</span></div>)}</article>}
-function Follow({leads}:{leads:any[]}){return <div className="follow"><article className="panel"><h2>Hoje <Pill s="4 pendentes"/></h2>{leads.slice(0,5).map((l,i)=><div key={l.name}><button>✓</button><span><b>{l.name}</b><small>{i%2?"Reunião comercial":"Retorno por WhatsApp"} · {l.next}</small></span><Avatar n={l.owner}/></div>)}</article><article className="panel calendar"><h2>Agosto 2026</h2><div>{["D","S","T","Q","Q","S","S",...Array.from({length:31},(_,i)=>i+1)].map((d,i)=><span className={d===10?"today":""} key={i}>{d}</span>)}</div><p><b>3 follow-ups atrasados</b><small>Revise as atividades que passaram do prazo.</small></p></article></div>}
-function Proposals(){return <><div className="stats compact">{[["Em elaboração","8"],["Enviadas","19"],["Aprovadas","12"],["Aguardando retorno","7"]].map((x,i)=><article key={x[0]}><i className={`stat s${i}`}>▤</i><span><small>{x[0]}</small><b>{x[1]}</b></span></article>)}</div><article className="panel list">{[["PROP-026","IMUNA Blindagens","Sistema web completo","R$ 18.500","Aguardando"],["PROP-025","FM Personalizados","Identidade visual + conteúdo","R$ 6.200","Enviada"],["PROP-024","Deubom Sports","Aplicativo web","R$ 24.000","Negociação"],["PROP-023","Thiago Consultoria","Site + hospedagem anual","R$ 9.800","Aprovada"]].map(x=><div key={x[0]}><b>{x[0]}<small>{x[1]}</small></b><span>{x[2]}</span><strong>{x[3]}</strong><Pill s={x[4]}/><button>•••</button></div>)}</article></>}
-function Clients(){return <div className="cards">{[["Forro Novo","Tráfego pago","R$ 4.800/mês","Matheus"],["IntegraCare MV","Site institucional","R$ 7.500","Ana Costa"],["Thiago Consultoria","Site + hospedagem","R$ 9.800","Matheus"]].map(x=><article className="panel" key={x[0]}><div><i>{x[0][0]}</i><Pill s="Ativo"/></div><h2>{x[0]}</h2><p>{x[1]}</p><strong>{x[2]}</strong><hr/><small>Executivo responsável</small><b className="owner"><Avatar n={x[3]}/>{x[3]}</b><button>Abrir portal do cliente →</button></article>)}</div>}
-function Tickets(){return <article className="panel list tickets">{[["#1048","Forro Novo","Ajuste na campanha do Google","Alta","Em andamento"],["#1047","IntegraCare MV","Troca de imagem no banner","Média","Aguardando cliente"],["#1046","FM Personalizados","Novo acesso ao Instagram","Baixa","Aberto"],["#1045","Thiago Consultoria","Atualização de conteúdo","Média","Concluído"]].map(x=><div key={x[0]}><b>{x[0]}</b><span><strong>{x[1]}</strong><small>{x[2]}</small></span><Pill s={x[3]}/><Pill s={x[4]}/><button>Ver chamado →</button></div>)}</article>}
-function Team(){return <div className="cards team">{[["Matheus Gouvea","Super Admin","42","R$ 78.400","31%"],["Ana Costa","Executiva de vendas","38","R$ 62.300","26%"],["Lucas Lima","Executivo de vendas","34","R$ 43.800","22%"]].map((x,i)=><article className="panel" key={x[0]}><Avatar n={x[0]}/><h2>{x[0]}</h2><p>{x[1]}</p><div><span>Leads ativos<b>{x[2]}</b></span><span>Pipeline<b>{x[3]}</b></span><span>Conversão<b>{x[4]}</b></span></div><progress value={[88,72,61][i]} max="100"/><small>{[88,72,61][i]}% da meta mensal</small><button>Ver desempenho</button></article>)}</div>}
-function Chat(){const [m,setM]=useState(["Bom dia, equipe! Reunião às 16h.","A proposta da FM foi atualizada."]),[v,setV]=useState("");return <div className="chat"><aside className="panel"><h3>CANAIS</h3><button className="selected"># Geral <b>2</b></button><button># Comercial</button><button># Projetos</button><h3>MENSAGENS DIRETAS</h3><button><Avatar n="Ana Costa"/>Ana Costa</button><button><Avatar n="Lucas Lima"/>Lucas Lima</button></aside><article className="panel"><header><b># Geral</b><small>3 membros</small></header><main>{m.map((x,i)=><div key={i}><Avatar n={i?"Ana Costa":"Matheus Gouvea"}/><p><b>{i?"Ana Costa":"Matheus Gouvea"}</b>{x}</p></div>)}</main><footer><input value={v} onChange={e=>setV(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&v){setM([...m,v]);setV("")}}} placeholder="Escreva uma mensagem..."/><button onClick={()=>{if(v){setM([...m,v]);setV("")}}}>➤</button></footer></article></div>}
-function Modal({children,close}:{children:any,close:()=>void}){return <div className="back" onMouseDown={close}><div className="modal" onMouseDown={e=>e.stopPropagation()}><button className="x" onClick={close}>×</button>{children}</div></div>}
-function Import({done}:{done:()=>void}){return <><label className="tag">IMPORTAÇÃO INTELIGENTE</label><h2>Carregar contatos do Excel</h2><p>Envie XLSX ou CSV. Duplicidades serão identificadas automaticamente.</p><label className="drop">⇧<b>Arraste sua planilha aqui</b><small>ou clique para selecionar · até 10 MB</small><input type="file"/></label><div className="radios"><b>Como distribuir os leads?</b><label><input type="radio" name="d" defaultChecked/> Escolher manualmente</label><label><input type="radio" name="d"/> Distribuição automática e equilibrada</label></div><button className="primary full" onClick={done}>Processar planilha</button></>}
-function LeadForm({done}:{done:(x:any)=>void}){const [name,setName]=useState("");return <><label className="tag">NOVO CADASTRO</label><h2>Adicionar lead</h2><p>Preencha os dados essenciais da oportunidade.</p><label>Empresa<input value={name} onChange={e=>setName(e.target.value)} placeholder="Nome da empresa"/></label><div className="form"><label>Contato<input placeholder="Nome completo"/></label><label>Executivo<select><option>Matheus</option><option>Ana Costa</option><option>Lucas Lima</option></select></label><label>Serviço<select><option>Sites e lojas virtuais</option><option>Tráfego pago</option><option>Sistemas e aplicativos</option><option>Identidade visual e conteúdo</option><option>Hospedagem</option></select></label><label>Valor estimado<input type="number" placeholder="0,00"/></label></div><button className="primary full" onClick={()=>name&&done({name,contact:"Novo contato",service:"Sites e lojas virtuais",value:0,stage:"Novo lead",owner:"Matheus",next:"Sem agendamento"})}>Cadastrar lead</button></>}
+
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
+
+const ADMIN_EMAIL = "i5mediaagencia@gmail.com";
+const nav = ["Visão geral", "Leads", "Pipeline", "Follow-ups", "Propostas", "Clientes", "Chamados", "Equipe", "Chat interno"];
+const stages = ["Novo lead", "Primeiro contato", "Reunião marcada", "Proposta enviada", "Negociação", "Ganho", "Perdido"];
+
+type Profile = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: "super_admin" | "executive" | "client";
+  active: boolean;
+};
+
+type Service = { id: string; name: string };
+
+type Lead = {
+  id: string;
+  name: string;
+  contact: string;
+  service: string;
+  serviceId: string | null;
+  value: number;
+  stage: string;
+  owner: string;
+  ownerId: string | null;
+  next: string;
+};
+
+type CompanyRow = {
+  id: string;
+  name: string;
+  estimated_value: number | string | null;
+  stage: string;
+  owner_id: string | null;
+  service_id: string | null;
+  contacts: { name: string; is_primary: boolean }[] | null;
+  services: { name: string } | null;
+  followups: { due_at: string | null; type: string; completed_at: string | null }[] | null;
+};
+
+const money = (value: number) =>
+  value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+
+const tone = (status: string) => {
+  if (["Ganho", "Aprovada", "Concluído", "Ativo"].some((x) => status.includes(x))) return "green";
+  if (["Reunião", "Alta", "Urgente", "Perdido"].some((x) => status.includes(x))) return "orange";
+  if (["Proposta", "Enviada", "Em andamento"].some((x) => status.includes(x))) return "blue";
+  return "purple";
+};
+
+function formatDate(value?: string | null) {
+  if (!value) return "Sem agendamento";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Ocorreu um erro inesperado.";
+}
+
+export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) return <LoadingScreen />;
+  if (!session) return <AuthScreen />;
+  return <AuthenticatedApp user={session.user} />;
+}
+
+function AuthenticatedApp({ user }: { user: User }) {
+  const [page, setPage] = useState("Visão geral");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState("");
+  const [toast, setToast] = useState("");
+
+  const flash = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 3000);
+  };
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [{ data: profileData }, { data: teamData }, { data: serviceData }, { data: companyData, error }] = await Promise.all([
+      supabase.from("profiles").select("id,email,full_name,role,active").eq("id", user.id).single(),
+      supabase.from("profiles").select("id,email,full_name,role,active").order("full_name"),
+      supabase.from("services").select("id,name").eq("active", true).order("name"),
+      supabase
+        .from("companies")
+        .select("id,name,estimated_value,stage,owner_id,service_id,contacts(name,is_primary),services(name),followups(due_at,type,completed_at)")
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (profileData) setProfile(profileData as Profile);
+    const team = (teamData ?? []) as Profile[];
+    setProfiles(team);
+    setServices((serviceData ?? []) as Service[]);
+
+    if (error) {
+      flash(`Não foi possível carregar os leads: ${error.message}`);
+      setLoading(false);
+      return;
+    }
+
+    const ownerNames = new Map(team.map((item) => [item.id, item.full_name || item.email]));
+    const rows = (companyData ?? []) as unknown as CompanyRow[];
+    const normalized = rows.map((item) => {
+      const primary = item.contacts?.find((contact) => contact.is_primary) ?? item.contacts?.[0];
+      const nextFollowup = item.followups
+        ?.filter((followup) => !followup.completed_at && followup.due_at)
+        .sort((a, b) => new Date(a.due_at ?? 0).getTime() - new Date(b.due_at ?? 0).getTime())[0];
+      return {
+        id: item.id,
+        name: item.name,
+        contact: primary?.name ?? "Contato não informado",
+        service: item.services?.name ?? "Serviço não informado",
+        serviceId: item.service_id,
+        value: Number(item.estimated_value ?? 0),
+        stage: item.stage,
+        owner: item.owner_id ? ownerNames.get(item.owner_id) ?? "Executivo" : "Não atribuído",
+        ownerId: item.owner_id,
+        next: formatDate(nextFollowup?.due_at),
+      } satisfies Lead;
+    });
+    setLeads(normalized);
+    setLoading(false);
+  }, [user.id]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadData]);
+
+  const stats = useMemo(() => {
+    const active = leads.filter((lead) => !["Ganho", "Perdido"].includes(lead.stage));
+    const won = leads.filter((lead) => lead.stage === "Ganho");
+    const finished = leads.filter((lead) => ["Ganho", "Perdido"].includes(lead.stage));
+    return {
+      active: active.length,
+      pipeline: active.reduce((total, lead) => total + lead.value, 0),
+      revenue: won.reduce((total, lead) => total + lead.value, 0),
+      conversion: finished.length ? (won.length / finished.length) * 100 : 0,
+    };
+  }, [leads]);
+
+  const moveLead = async (lead: Lead, stage: string) => {
+    setLeads((current) => current.map((item) => (item.id === lead.id ? { ...item, stage } : item)));
+    const { error } = await supabase
+      .from("companies")
+      .update({ stage, closed_at: ["Ganho", "Perdido"].includes(stage) ? new Date().toISOString() : null })
+      .eq("id", lead.id);
+    if (error) {
+      flash(error.message);
+      await loadData();
+      return;
+    }
+    flash(`Lead movido para ${stage}`);
+  };
+
+  const addLead = async (input: NewLeadInput) => {
+    const { data, error } = await supabase
+      .from("companies")
+      .insert({
+        name: input.name,
+        estimated_value: input.value,
+        service_id: input.serviceId || null,
+        owner_id: input.ownerId || user.id,
+        created_by: user.id,
+        source: input.source || "Manual",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    if (input.contact && data) {
+      const { error: contactError } = await supabase.from("contacts").insert({
+        company_id: data.id,
+        name: input.contact,
+        kind: "Responsável",
+        is_primary: true,
+      });
+      if (contactError) throw contactError;
+    }
+    await loadData();
+  };
+
+  if (loading || !profile) return <LoadingScreen />;
+  if (profile.role === "client") return <ClientPortal profile={profile} leads={leads} />;
+
+  const visibleNav = profile.role === "super_admin" ? nav : nav.filter((item) => item !== "Equipe");
+  const displayName = profile.full_name || profile.email.split("@")[0];
+
+  return (
+    <div className="shell">
+      <aside>
+        <div className="brand"><b>i5</b><span><strong>I5MEDIA</strong><small>Sales Hub</small></span></div>
+        <nav>
+          {visibleNav.map((item, index) => (
+            <button className={page === item ? "active" : ""} onClick={() => setPage(item)} key={item}>
+              <i>{["▦", "◎", "▥", "◷", "▤", "♙", "◈", "♚", "◌"][index]}</i>{item}
+            </button>
+          ))}
+        </nav>
+        <div className="storage"><span>Supabase <b>Conectado</b></span><progress value="100" max="100"/><small>Banco, login e segurança ativos</small></div>
+      </aside>
+      <main>
+        <header>
+          <div className="search">⌕ <input placeholder="Buscar empresa, contato ou CNPJ..."/><kbd>⌘ K</kbd></div>
+          <button className="bell" aria-label="Notificações">♢<i/></button>
+          <div className="user"><Avatar name={displayName}/><span><b>{displayName}</b><small>{roleName(profile.role)}</small></span></div>
+          <button className="logout" onClick={() => supabase.auth.signOut()}>Sair</button>
+        </header>
+        <section>
+          <Title page={page} name={displayName.split(" ")[0]} add={() => setModal("lead")} imp={() => setModal("import")}/>
+          {page === "Visão geral" && <Dashboard leads={leads} stats={stats} go={setPage}/>} 
+          {page === "Pipeline" && <Pipeline leads={leads} move={moveLead}/>} 
+          {page === "Leads" && <LeadList leads={leads}/>} 
+          {page === "Follow-ups" && <Follow leads={leads}/>} 
+          {page === "Propostas" && <Proposals leads={leads}/>} 
+          {page === "Clientes" && <Clients leads={leads.filter((lead) => lead.stage === "Ganho")}/>} 
+          {page === "Chamados" && <Tickets/>} 
+          {page === "Equipe" && <Team profiles={profiles} onAdd={() => setModal("user")}/>} 
+          {page === "Chat interno" && <Chat profile={profile}/>} 
+        </section>
+      </main>
+      <button className="float" onClick={() => setPage("Chat interno")}>◌</button>
+      {toast && <div className="toast">✓ {toast}</div>}
+      {modal && (
+        <Modal close={() => setModal("")}>
+          {modal === "import" && <Import done={() => { setModal(""); flash("Planilha pronta para processamento; integração do parser será a próxima etapa."); }}/>} 
+          {modal === "lead" && <LeadForm services={services} profiles={profiles} currentUserId={user.id} done={async (input) => { try { await addLead(input); setModal(""); flash("Lead cadastrado no Supabase"); } catch (error: unknown) { flash(errorMessage(error)); } }}/>} 
+          {modal === "user" && <UserForm done={() => { setModal(""); loadData(); flash("Usuário criado com acesso seguro"); }}/>} 
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function AuthScreen() {
+  const [mode, setMode] = useState<"login" | "register" | "recover">("login");
+  const [email, setEmail] = useState(ADMIN_EMAIL);
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("Matheus Gouvea");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      if (mode === "login") {
+        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError) throw authError;
+      } else if (mode === "register") {
+        if (email.toLowerCase() !== ADMIN_EMAIL) throw new Error("O primeiro acesso está reservado ao e-mail do Super Admin.");
+        const { data, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: name } },
+        });
+        if (authError) throw authError;
+        setMessage(data.session ? "Conta criada e acesso liberado." : "Conta criada. Confirme o e-mail recebido e depois entre no sistema.");
+        if (!data.session) setMode("login");
+      } else {
+        const { error: authError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+        if (authError) throw authError;
+        setMessage("Enviamos um link de recuperação para o seu e-mail.");
+      }
+    } catch (submitError: unknown) {
+      setError(translateAuthError(errorMessage(submitError)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="auth-screen">
+      <section className="auth-brand">
+        <div className="auth-logo">i5</div>
+        <span>I5MEDIA · CRM COMERCIAL</span>
+        <h1>Vendas organizadas.<br/>Relacionamentos que crescem.</h1>
+        <p>Pipeline, propostas, follow-ups, clientes e equipe em uma única central conectada ao Supabase.</p>
+        <div className="auth-status"><i/> Supabase conectado e protegido por RLS</div>
+      </section>
+      <section className="auth-card">
+        <label className="tag">ACESSO SEGURO</label>
+        <h2>{mode === "login" ? "Entrar no Sales Hub" : mode === "register" ? "Criar acesso do Super Admin" : "Recuperar senha"}</h2>
+        <p>{mode === "register" ? "Não existe senha padrão. Defina uma senha forte e exclusiva." : "Use seu e-mail e senha cadastrados no Supabase."}</p>
+        <form onSubmit={submit}>
+          {mode === "register" && <label>Nome completo<input value={name} onChange={(event) => setName(event.target.value)} required/></label>}
+          <label>E-mail<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required/></label>
+          {mode !== "recover" && <label>Senha<input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 8 caracteres" required/></label>}
+          {error && <div className="auth-error">{error}</div>}
+          {message && <div className="auth-success">{message}</div>}
+          <button className="primary full" disabled={busy}>{busy ? "Aguarde..." : mode === "login" ? "Entrar" : mode === "register" ? "Criar meu acesso" : "Enviar link"}</button>
+        </form>
+        <div className="auth-links">
+          {mode !== "register" && <button onClick={() => setMode("register")}>Primeiro acesso</button>}
+          {mode !== "recover" && <button onClick={() => setMode("recover")}>Esqueci minha senha</button>}
+          {mode !== "login" && <button onClick={() => setMode("login")}>Voltar ao login</button>}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function translateAuthError(message: string) {
+  if (message.includes("Invalid login credentials")) return "E-mail ou senha incorretos.";
+  if (message.includes("already registered")) return "Este e-mail já está cadastrado. Use Entrar ou recupere a senha.";
+  if (message.includes("Password should")) return "A senha precisa ter pelo menos 8 caracteres.";
+  return message;
+}
+
+function LoadingScreen() {
+  return <main className="loading-screen"><div className="auth-logo">i5</div><span>Conectando ao Sales Hub...</span></main>;
+}
+
+function roleName(role: Profile["role"]) {
+  return role === "super_admin" ? "Super administrador" : role === "executive" ? "Executivo de vendas" : "Cliente";
+}
+
+function Avatar({ name }: { name: string }) {
+  return <i className="avatar">{name.split(" ").filter(Boolean).map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</i>;
+}
+
+function Title({ page, name, add, imp }: { page: string; name: string; add: () => void; imp: () => void }) {
+  const data: Record<string, [string, string]> = {
+    "Visão geral": [`Olá, ${name}! 👋`, "Aqui está o panorama comercial da sua agência hoje."],
+    Leads: ["Leads e contatos", "Toda a base comercial da agência em um só lugar."],
+    Pipeline: ["Pipeline de vendas", "Acompanhe cada oportunidade até o fechamento."],
+    "Follow-ups": ["Follow-ups e agenda", "Nenhuma oportunidade fica esquecida."],
+    Propostas: ["Propostas e orçamentos", "Crie, envie e acompanhe propostas comerciais."],
+    Clientes: ["Clientes", "Contratos, acessos e relacionamento em um só lugar."],
+    Chamados: ["Chamados dos clientes", "Centralize as solicitações após o fechamento."],
+    Equipe: ["Equipe comercial", "Cadastre executivos, metas, carteiras e produtividade."],
+    "Chat interno": ["Chat interno", "Conversas privadas e canais da equipe."],
+  };
+  return <div className="title"><div><span>{new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(new Date()).toUpperCase()}</span><h1>{data[page]?.[0]}</h1><p>{data[page]?.[1]}</p></div>{["Visão geral", "Leads"].includes(page) && <div><button className="ghost" onClick={imp}>⇧ Importar Excel</button><button className="primary" onClick={add}>＋ Novo lead</button></div>}</div>;
+}
+
+function Dashboard({ leads, stats, go }: { leads: Lead[]; stats: { active: number; pipeline: number; revenue: number; conversion: number }; go: (page: string) => void }) {
+  return <><div className="stats">{[
+    ["Leads em tratamento", String(stats.active), "Carteira atual", "◎"],
+    ["Pipeline em aberto", money(stats.pipeline), "Valor estimado", "◈"],
+    ["Faturamento ganho", money(stats.revenue), "Contratos ganhos", "↗"],
+    ["Taxa de conversão", `${stats.conversion.toFixed(1)}%`, "Ganho ÷ encerrados", "⌁"],
+  ].map((item, index) => <article key={item[0]}><i className={`stat s${index}`}>{item[3]}</i><span><small>{item[0]}</small><b>{item[1]}</b><em>{item[2]}</em></span></article>)}</div><div className="two"><article className="panel"><Head title="Pipeline por etapa" subtitle="Dados atualizados no Supabase" action="Ver pipeline →" click={() => go("Pipeline")}/><div className="funnel">{stages.map((stage) => { const count = leads.filter((lead) => lead.stage === stage).length; const width = leads.length ? Math.max(8, (count / leads.length) * 100) : 8; return <div key={stage}><span>{stage}</span><b><i style={{ width: `${width}%` }}/></b><em>{count}</em></div>; })}</div></article><article className="panel agenda"><Head title="Próximos follow-ups" subtitle="Agenda da carteira" action="Ver agenda →" click={() => go("Follow-ups")}/>{leads.slice(0, 5).map((lead) => <div key={lead.id}><b>◷</b><i/><span><Pill status="Follow-up"/><strong>{lead.name}</strong><small>{lead.next}</small></span></div>)}</article></div><article className="panel deals recent"><Head title="Negociações recentes" subtitle="Últimas oportunidades da carteira" action="Ver todas →" click={() => go("Leads")}/>{leads.slice(0, 6).map((lead) => <div key={lead.id}><span className="company"><i>{lead.name[0]}</i><b>{lead.name}<small>{lead.service}</small></b></span><Pill status={lead.stage}/><strong>{money(lead.value)}</strong><span className="owner"><Avatar name={lead.owner}/>{lead.owner}</span><small>{lead.next}</small></div>)}</article></>;
+}
+
+function Head({ title, subtitle, action, click }: { title: string; subtitle: string; action: string; click?: () => void }) {
+  return <div className="head"><span><b>{title}</b><small>{subtitle}</small></span><button onClick={click}>{action}</button></div>;
+}
+
+function Pill({ status }: { status: string }) {
+  return <span className={`pill ${tone(status)}`}>{status}</span>;
+}
+
+function Pipeline({ leads, move }: { leads: Lead[]; move: (lead: Lead, stage: string) => void }) {
+  return <div className="kanban">{stages.map((stage, index) => <div key={stage}><h3><i/>{stage}<em>{leads.filter((lead) => lead.stage === stage).length}</em></h3>{leads.filter((lead) => lead.stage === stage).map((lead) => <article key={lead.id}><span className="logo">{lead.name[0]}</span><small>{lead.service}</small><h4>{lead.name}</h4><p>{lead.contact}</p><b>{money(lead.value)}</b><footer><Avatar name={lead.owner}/><span>◷ {lead.next}</span></footer><select value={lead.stage} onChange={(event) => move(lead, event.target.value)}>{stages.map((item) => <option key={item}>{item}</option>)}</select>{index < 5 && <button onClick={() => move(lead, stages[index + 1])}>Avançar →</button>}</article>)}</div>)}</div>;
+}
+
+function LeadList({ leads }: { leads: Lead[] }) {
+  return <article className="panel table"><header><span>EMPRESA / CONTATO</span><span>SERVIÇO</span><span>ETAPA</span><span>VALOR</span><span>RESPONSÁVEL</span></header>{leads.map((lead) => <div key={lead.id}><span className="company"><i>{lead.name[0]}</i><b>{lead.name}<small>{lead.contact}</small></b></span><span>{lead.service}</span><Pill status={lead.stage}/><strong>{money(lead.value)}</strong><span className="owner"><Avatar name={lead.owner}/>{lead.owner}</span></div>)}</article>;
+}
+
+function Follow({ leads }: { leads: Lead[] }) {
+  return <div className="follow"><article className="panel"><h2>Próximas atividades <Pill status={`${leads.length} leads`}/></h2>{leads.slice(0, 8).map((lead) => <div key={lead.id}><button>✓</button><span><b>{lead.name}</b><small>Follow-up · {lead.next}</small></span><Avatar name={lead.owner}/></div>)}</article><article className="panel calendar"><h2>Agenda comercial</h2><div>{["D", "S", "T", "Q", "Q", "S", "S", ...Array.from({ length: 31 }, (_, index) => index + 1)].map((day, index) => <span className={day === new Date().getDate() ? "today" : ""} key={index}>{day}</span>)}</div><p><b>Follow-ups rastreados</b><small>Cada atividade fica vinculada à empresa e ao executivo responsável.</small></p></article></div>;
+}
+
+function Proposals({ leads }: { leads: Lead[] }) {
+  const sent = leads.filter((lead) => ["Proposta enviada", "Negociação", "Ganho"].includes(lead.stage));
+  return <><div className="stats compact">{[["Em elaboração", "0"], ["Enviadas", String(sent.length)], ["Aprovadas", String(leads.filter((lead) => lead.stage === "Ganho").length)], ["Aguardando retorno", String(leads.filter((lead) => lead.stage === "Proposta enviada").length)]].map((item, index) => <article key={item[0]}><i className={`stat s${index}`}>▤</i><span><small>{item[0]}</small><b>{item[1]}</b></span></article>)}</div><article className="panel empty-state"><b>Orçamentos conectados ao cadastro</b><p>Os serviços iniciais já estão cadastrados no Supabase. A criação do PDF será liberada na próxima evolução da tela.</p></article></>;
+}
+
+function Clients({ leads }: { leads: Lead[] }) {
+  if (!leads.length) return <article className="panel empty-state"><b>Nenhum contrato ganho ainda</b><p>Ao mover uma negociação para “Ganho”, ela aparecerá aqui para gerar o acesso do cliente.</p></article>;
+  return <div className="cards">{leads.map((lead) => <article className="panel" key={lead.id}><div><i>{lead.name[0]}</i><Pill status="Ativo"/></div><h2>{lead.name}</h2><p>{lead.service}</p><strong>{money(lead.value)}</strong><hr/><small>Executivo responsável</small><b className="owner"><Avatar name={lead.owner}/>{lead.owner}</b><button>Abrir ficha do cliente →</button></article>)}</div>;
+}
+
+function Tickets() {
+  return <article className="panel empty-state"><b>Central de chamados pronta</b><p>Clientes autenticados podem abrir chamados vinculados à própria empresa; a equipe visualiza conforme as permissões do Supabase.</p></article>;
+}
+
+function Team({ profiles, onAdd }: { profiles: Profile[]; onAdd: () => void }) {
+  return <><div className="section-actions"><button className="primary" onClick={onAdd}>＋ Cadastrar executivo</button></div><div className="cards team">{profiles.filter((profile) => profile.role !== "client").map((profile) => <article className="panel" key={profile.id}><Avatar name={profile.full_name || profile.email}/><h2>{profile.full_name || "Sem nome"}</h2><p>{roleName(profile.role)}</p><div><span>Status<b>{profile.active ? "Ativo" : "Inativo"}</b></span><span>Carteira<b>Rastreada</b></span><span>Acesso<b>Seguro</b></span></div><small>{profile.email}</small><button>Ver desempenho</button></article>)}</div></>;
+}
+
+function Chat({ profile }: { profile: Profile }) {
+  const [messages, setMessages] = useState<{ id: string; body: string; sender_id: string; created_at: string }[]>([]);
+  const [value, setValue] = useState("");
+
+  const loadMessages = useCallback(async () => {
+    const { data } = await supabase.from("team_messages").select("id,body,sender_id,created_at").eq("channel", "geral").eq("is_private", false).order("created_at").limit(100);
+    setMessages(data ?? []);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadMessages(), 0);
+    const channel = supabase.channel("team-chat").on("postgres_changes", { event: "INSERT", schema: "public", table: "team_messages" }, () => loadMessages()).subscribe();
+    return () => { window.clearTimeout(timer); supabase.removeChannel(channel); };
+  }, [loadMessages]);
+
+  const send = async () => {
+    const body = value.trim();
+    if (!body) return;
+    const { error } = await supabase.from("team_messages").insert({ sender_id: profile.id, channel: "geral", body, is_private: false });
+    if (!error) { setValue(""); await loadMessages(); }
+  };
+
+  return <div className="chat"><aside className="panel"><h3>CANAIS</h3><button className="selected"># Geral</button><button># Comercial</button><button># Projetos</button><h3>MENSAGENS DIRETAS</h3><small>Conversas privadas protegidas por RLS</small></aside><article className="panel"><header><b># Geral</b><small>Canal interno da equipe</small></header><main>{messages.length ? messages.map((message) => <div key={message.id}><Avatar name={message.sender_id === profile.id ? profile.full_name : "Equipe"}/><p><b>{message.sender_id === profile.id ? "Você" : "Equipe"}</b>{message.body}</p></div>) : <div className="empty-chat">Envie a primeira mensagem para a equipe.</div>}</main><footer><input value={value} onChange={(event) => setValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") send(); }} placeholder="Escreva uma mensagem..."/><button onClick={send}>➤</button></footer></article></div>;
+}
+
+function ClientPortal({ profile, leads }: { profile: Profile; leads: Lead[] }) {
+  const company = leads[0];
+  return <main className="client-portal"><header><div className="brand"><b>i5</b><span><strong>I5MEDIA</strong><small>Portal do cliente</small></span></div><div className="user"><Avatar name={profile.full_name || profile.email}/><span><b>{profile.full_name || profile.email}</b><small>Cliente</small></span></div><button className="logout" onClick={() => supabase.auth.signOut()}>Sair</button></header><section><label className="tag">ÁREA DO CLIENTE</label><h1>{company?.name ?? "Bem-vindo ao portal"}</h1><p>Acompanhe contrato, propostas e chamados em um ambiente seguro.</p><div className="client-grid"><article className="panel"><i>▤</i><h2>Contrato e documentos</h2><p>PDFs anexados à sua empresa aparecerão aqui.</p><button>Acessar documentos</button></article><article className="panel"><i>◈</i><h2>Abrir chamado</h2><p>Fale com o executivo responsável pelo atendimento.</p><button>Novo chamado</button></article><article className="panel"><i>♙</i><h2>Seu executivo</h2><p>{company?.owner ?? "A equipe I5Media"}</p><button>Iniciar conversa</button></article></div></section></main>;
+}
+
+function Modal({ children, close }: { children: ReactNode; close: () => void }) {
+  return <div className="back" onMouseDown={close}><div className="modal" onMouseDown={(event) => event.stopPropagation()}><button className="x" onClick={close}>×</button>{children}</div></div>;
+}
+
+function Import({ done }: { done: () => void }) {
+  return <><label className="tag">IMPORTAÇÃO INTELIGENTE</label><h2>Carregar contatos do Excel</h2><p>Envie XLSX ou CSV. Duplicidades serão identificadas automaticamente.</p><label className="drop">⇧<b>Arraste sua planilha aqui</b><small>ou clique para selecionar · até 10 MB</small><input type="file" accept=".xlsx,.xls,.csv"/></label><div className="radios"><b>Como distribuir os leads?</b><label><input type="radio" name="distribution" defaultChecked/> Escolher manualmente</label><label><input type="radio" name="distribution"/> Distribuição automática e equilibrada</label></div><button className="primary full" onClick={done}>Processar planilha</button></>;
+}
+
+type NewLeadInput = { name: string; contact: string; serviceId: string; ownerId: string; value: number; source: string };
+
+function LeadForm({ services, profiles, currentUserId, done }: { services: Service[]; profiles: Profile[]; currentUserId: string; done: (input: NewLeadInput) => Promise<void> }) {
+  const [form, setForm] = useState<NewLeadInput>({ name: "", contact: "", serviceId: services[0]?.id ?? "", ownerId: currentUserId, value: 0, source: "Manual" });
+  const [busy, setBusy] = useState(false);
+  const submit = async () => { if (!form.name) return; setBusy(true); try { await done(form); } finally { setBusy(false); } };
+  return <><label className="tag">NOVO CADASTRO</label><h2>Adicionar lead</h2><p>O lead será salvo e rastreado no Supabase.</p><label>Empresa<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Nome da empresa"/></label><div className="form"><label>Contato principal<input value={form.contact} onChange={(event) => setForm({ ...form, contact: event.target.value })} placeholder="Nome completo"/></label><label>Executivo<select value={form.ownerId} onChange={(event) => setForm({ ...form, ownerId: event.target.value })}>{profiles.filter((item) => item.role !== "client" && item.active).map((item) => <option value={item.id} key={item.id}>{item.full_name || item.email}</option>)}</select></label><label>Serviço<select value={form.serviceId} onChange={(event) => setForm({ ...form, serviceId: event.target.value })}>{services.map((service) => <option value={service.id} key={service.id}>{service.name}</option>)}</select></label><label>Valor estimado<input type="number" min="0" value={form.value} onChange={(event) => setForm({ ...form, value: Number(event.target.value) })}/></label><label>Origem<select value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })}><option>Manual</option><option>Indicação</option><option>Site</option><option>Instagram</option><option>Google</option><option>Prospecção</option></select></label></div><button className="primary full" disabled={busy} onClick={submit}>{busy ? "Salvando..." : "Cadastrar lead"}</button></>;
+}
+
+function UserForm({ done }: { done: () => void }) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async () => {
+    setBusy(true); setError("");
+    const { error: invokeError } = await supabase.functions.invoke("admin-create-user", { body: { full_name: fullName, email, password, role: "executive" } });
+    setBusy(false);
+    if (invokeError) { setError(invokeError.message); return; }
+    done();
+  };
+  return <><label className="tag">EQUIPE COMERCIAL</label><h2>Cadastrar executivo</h2><p>Crie um acesso individual para rastrear cada lead trabalhado.</p><label>Nome completo<input value={fullName} onChange={(event) => setFullName(event.target.value)} required/></label><label>E-mail<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required/></label><label>Senha temporária<input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 8 caracteres" required/></label>{error && <div className="auth-error">{error}</div>}<button className="primary full" onClick={submit} disabled={busy || !fullName || !email || password.length < 8}>{busy ? "Criando..." : "Criar acesso seguro"}</button></>;
+}
