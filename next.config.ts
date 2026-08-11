@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
+const isHostingerBuild = process.env.HOSTINGER_BUILD === "1";
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  poweredByHeader: false,
+  typescript: {
+    tsconfigPath: isHostingerBuild ? "./tsconfig.hostinger.json" : "./tsconfig.json",
+  },
 };
 
 export default nextConfig;
